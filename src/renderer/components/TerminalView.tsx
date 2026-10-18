@@ -38,6 +38,35 @@ export function TerminalView({ name }: { name: string }) {
     termRef.current = term;
     fit.fit();
 
+    const copySelection = () => {
+      const text = term.getSelection();
+      if (!text) return false;
+      void navigator.clipboard.writeText(text).catch(() => undefined);
+      return true;
+    };
+    const pasteClipboard = () => {
+      void navigator.clipboard.readText().then((t) => t && term.paste(t)).catch(() => undefined);
+    };
+    // Ctrl+C копирует, когда есть выделение (иначе это прерывание для claude); Ctrl+Shift+C/V — всегда.
+    term.attachCustomKeyEventHandler((e) => {
+      if (e.type !== 'keydown' || !e.ctrlKey || e.altKey || e.metaKey) return true;
+      const key = e.key.toLowerCase();
+      if (key === 'c' && (e.shiftKey || term.hasSelection())) {
+        copySelection();
+        return false;
+      }
+      if (key === 'v' && e.shiftKey) {
+        pasteClipboard();
+        return false;
+      }
+      return true;
+    });
+    const onContext = (e: MouseEvent) => {
+      e.preventDefault();
+      if (!copySelection()) pasteClipboard();
+    };
+    el.addEventListener('contextmenu', onContext);
+
     const offData = api.term.onData((d) => term.write(d));
     const offExit = api.term.onExit((reason) => {
       if (reason === 'connection-lost') return;
@@ -58,6 +87,7 @@ export function TerminalView({ name }: { name: string }) {
 
     return () => {
       ro.disconnect();
+      el.removeEventListener('contextmenu', onContext);
       input.dispose();
       offData();
       offExit();
