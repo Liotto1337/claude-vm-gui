@@ -11,7 +11,8 @@ export function cdPrefix(dir: string): string {
   return `cd ${shellQuote(d)}`;
 }
 
-const SESSION_NAME = /^[A-Za-z0-9._-]{1,64}$/;
+// Без точки: tmux молча заменяет её на «_» (my.proj → my_proj)
+const SESSION_NAME = /^[A-Za-z0-9_-]{1,64}$/;
 
 export function validateSessionName(name: string): boolean {
   return SESSION_NAME.test(name);

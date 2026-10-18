@@ -39,7 +39,7 @@ export function NewSessionDialog({ onClose }: { onClose: () => void }) {
         <div className="field">
           <label htmlFor="ns-name">Имя сессии tmux</label>
           <input id="ns-name" value={name} autoFocus placeholder="claude-site" onChange={(e) => setName(e.target.value)} />
-          <span className={name && !nameOk ? 'hint hint-error' : 'hint'}>Латиница, цифры, точка, дефис и подчёркивание</span>
+          <span className={name && !nameOk ? 'hint hint-error' : 'hint'}>Латиница, цифры, дефис и подчёркивание</span>
         </div>
         <div className="field dir-field">
           <label htmlFor="ns-dir">Рабочая папка на ВМ</label>

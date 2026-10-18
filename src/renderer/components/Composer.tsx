@@ -29,6 +29,9 @@ export function Composer({ session }: { session: TmuxSession }) {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [sendError, setSendError] = useState<string | null>(null);
   const box = useRef<HTMLTextAreaElement>(null);
+  // Отправка уже идёт — второй Enter не должен отправить то же сообщение ещё раз
+  const sending = useRef(false);
+  const [busy, setBusy] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
   // Подсказки команд и моделей — для рабочей папки сессии
@@ -99,11 +102,17 @@ export function Composer({ session }: { session: TmuxSession }) {
 
   const uploading = attachments.some((a) => a.status === 'uploading');
   const ready = attachments.filter((a) => a.status === 'done');
-  const canSend = !uploading && !attachments.some((a) => a.status === 'error') && (text.trim() !== '' || ready.length > 0);
+  const canSend =
+    session.claudeRunning && !busy && !uploading && !attachments.some((a) => a.status === 'error') && (text.trim() !== '' || ready.length > 0);
 
   const send = async () => {
-    if (!canSend) return;
-    const r = await api.term.send(text, ready.map((a) => a.remotePath!));
+    if (!canSend || sending.current) return;
+    sending.current = true;
+    setBusy(true);
+    const r = await api.term.send(text, ready.map((a) => a.remotePath!)).finally(() => {
+      sending.current = false;
+      setBusy(false);
+    });
     if (!r.ok) {
       setSendError(r.error.message);
       return;

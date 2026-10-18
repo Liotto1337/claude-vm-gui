@@ -44,7 +44,7 @@ test('новая сессия появляется, открывается, те
     await expect(dialog.getByLabel('Сразу запустить claude')).toBeChecked();
     await dialog.getByLabel('Имя сессии tmux').fill('bad name');
     await expect(dialog.getByRole('button', { name: 'Создать' })).toBeDisabled();
-    await expect(dialog.getByText('Латиница, цифры, точка, дефис и подчёркивание')).toBeVisible();
+    await expect(dialog.getByText('Латиница, цифры, дефис и подчёркивание')).toBeVisible();
     // Подсказки папок с ВМ
     await dialog.getByLabel('Рабочая папка на ВМ').fill('/ro');
     await expect(dialog.getByRole('option', { name: '/root' })).toBeVisible();

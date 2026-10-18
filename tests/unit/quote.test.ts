@@ -16,7 +16,8 @@ describe('cdPrefix', () => {
 });
 
 describe('validateSessionName', () => {
-  it.each(['claude-game', 'a', 'v1.2_x', 'A'.repeat(64)])('принимает %s', (n) => expect(validateSessionName(n)).toBe(true));
-  it.each(['', 'a;rm', 'two words', 'имя', 'a:b', 'A'.repeat(65), '-x\n'])('отклоняет %j', (n) =>
+  it.each(['claude-game', 'a', 'v1_2-x', 'A'.repeat(64)])('принимает %s', (n) => expect(validateSessionName(n)).toBe(true));
+  // Точку tmux молча заменяет на «_» (my.proj → my_proj), поэтому её не принимаем
+  it.each(['', 'a;rm', 'two words', 'имя', 'a:b', 'site.ru', 'A'.repeat(65), '-x\n'])('отклоняет %j', (n) =>
     expect(validateSessionName(n)).toBe(false));
 });

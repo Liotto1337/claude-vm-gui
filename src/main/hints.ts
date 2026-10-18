@@ -24,7 +24,8 @@ export class HintsService {
     const cached = this.commandsCache.get(cwd);
     if (cached) return ok(cached);
     if (!this.conn.connected) return fail('NOT_CONNECTED', 'Нет подключения к ВМ');
-    const claude = `${shellQuote(this.claudeBin)} -p --input-format stream-json --output-format stream-json --verbose --no-session-persistence`;
+    // Только настройки пользователя и без MCP проекта: папка может быть чужой, а её хуки выполнились бы
+    const claude = `${shellQuote(this.claudeBin)} -p --input-format stream-json --output-format stream-json --verbose --no-session-persistence --setting-sources user --strict-mcp-config`;
     // Login-оболочка: так на большинстве ВМ в PATH есть ~/.local/bin, куда ставится claude
     const cmd = `${cdPrefix(cwd)} && bash -lc ${shellQuote(claude)}`;
     const request = JSON.stringify({ type: 'control_request', request_id: 'cvg-init', request: { subtype: 'initialize' } });
@@ -51,7 +52,7 @@ export class HintsService {
     if (cached && Date.now() - cached.at < FILES_TTL_MS) return ok(cached.files);
     if (!this.conn.connected) return fail('NOT_CONNECTED', 'Нет подключения к ВМ');
     const find = `find . -maxdepth 4 -type f -not -path '*/.*' -not -path '*/node_modules/*' | sed 's|^\\./||'`;
-    const r = await this.conn.exec(`${cdPrefix(cwd)} && { git ls-files 2>/dev/null || ${find}; } | head -5000`);
+    const r = await this.conn.exec(`${cdPrefix(cwd)} && { git -c core.quotePath=false ls-files 2>/dev/null || ${find}; } | head -5000`);
     if (r.code !== 0 && r.stdout === '') return fail('HINTS_FAILED', r.stderr.trim() || 'Не удалось получить список файлов');
     const files = r.stdout.split('\n').filter(Boolean);
     this.filesCache.set(cwd, { at: Date.now(), files });

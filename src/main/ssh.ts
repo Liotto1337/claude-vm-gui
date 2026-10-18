@@ -4,8 +4,10 @@ import { dirname } from 'node:path';
 import { Client, utils, type ClientChannel, type ConnectConfig, type SFTPWrapper } from 'ssh2';
 import { backoffDelay } from '@shared/backoff';
 import { fail, ok, type ConnectionState, type HostKeyPrompt, type PreflightEvent, type Result, type VmConfig } from '@shared/ipc';
-import { checkKnownHosts, fingerprintSha256, keyTypeFromBlob, knownHostsLine } from '@shared/known-hosts';
-import { runPreflight } from './preflight';
+import { checkKnownHosts, fingerprintSha256, hostKeyAlgorithms, keyTypeFromBlob, knownHostsLine, knownTypesFor } from '@shared/known-hosts';
+import { checkTcp, runPreflight } from './preflight';
+
+const HANDSHAKE_MS = 20_000;
 
 export interface SshOptions {
   knownHostsPath: string;
@@ -86,16 +88,33 @@ export class SshConnection extends EventEmitter {
     if (!auth) {
       return Promise.resolve(fail('AUTH_FAILED', `Не удалось прочитать ключ ${this.cfg.keyPath}, и ssh-agent недоступен`));
     }
+    const knownText = existsSync(this.opts.knownHostsPath) ? readFileSync(this.opts.knownHostsPath, 'utf8') : '';
+    const knownTypes = knownTypesFor(knownText, this.cfg.host, this.cfg.port);
     return new Promise((resolve) => {
       const client = new Client();
       let verdict: HostKeyVerdict = 'ok';
       let mismatchText = '';
       let settled = false;
+      // Свой таймер вместо readyTimeout ssh2: он замирает, пока человек сверяет отпечаток
+      let deadline: ReturnType<typeof setTimeout> | null = null;
+      const disarm = () => {
+        if (deadline) clearTimeout(deadline);
+        deadline = null;
+      };
+      const arm = () => {
+        disarm();
+        deadline = setTimeout(() => {
+          settle(fail('TCP_UNREACHABLE', 'Сервер не ответил за 20 с'));
+          client.end();
+        }, HANDSHAKE_MS);
+      };
       const settle = (r: Result<void>) => {
+        disarm();
         if (settled) return;
         settled = true;
         resolve(r);
       };
+      arm();
 
       client.on('ready', () => {
         this.client = client;
@@ -106,6 +125,10 @@ export class SshConnection extends EventEmitter {
       client.on('error', (err) => {
         if (verdict === 'mismatch') settle(fail('HOSTKEY_MISMATCH', mismatchText));
         else if (verdict === 'rejected') settle(fail('HOSTKEY_REJECTED', 'Ключ сервера не принят'));
+        else if (knownTypes.length > 0 && /host key|no matching/i.test(err.message))
+          settle(
+            fail('HOSTKEY_MISMATCH', `Сервер не предложил ключ известного типа (${knownTypes.join(', ')}). Возможна подмена сервера`),
+          );
         else if (/authentication methods failed/i.test(err.message))
           settle(fail('AUTH_FAILED', `Сервер не принял ключ ${this.cfg.keyPath}. Проверьте путь к ключу или ssh-agent`));
         else settle(fail('TCP_UNREACHABLE', err.message));
@@ -117,21 +140,32 @@ export class SshConnection extends EventEmitter {
         port: this.cfg.port,
         username: this.cfg.username,
         ...auth,
-        readyTimeout: 15_000,
-        keepaliveInterval: 15_000,
+        readyTimeout: 0,
+        // Сон ПК или пропавшая сеть замечаются примерно за 15 с
+        keepaliveInterval: 5_000,
         keepaliveCountMax: 3,
+        ...(knownTypes.length > 0 ? { algorithms: { serverHostKey: hostKeyAlgorithms(knownTypes) as never } } : {}),
         hostVerifier: (key: Buffer, verify: (valid: boolean) => void) => {
-          void this.verifyHost(key, interactive).then((v) => {
-            verdict = v.verdict;
-            mismatchText = v.message;
-            verify(v.verdict === 'ok');
-          });
+          this.verifyHost(key, interactive, { pause: disarm, resume: arm })
+            .then((v) => {
+              verdict = v.verdict;
+              mismatchText = v.message;
+              verify(v.verdict === 'ok');
+            })
+            .catch(() => {
+              verdict = 'rejected';
+              verify(false);
+            });
         },
       });
     });
   }
 
-  private async verifyHost(key: Buffer, interactive: boolean): Promise<{ verdict: HostKeyVerdict; message: string }> {
+  private async verifyHost(
+    key: Buffer,
+    interactive: boolean,
+    timer: { pause: () => void; resume: () => void },
+  ): Promise<{ verdict: HostKeyVerdict; message: string }> {
     const { host, port } = this.cfg;
     const type = keyTypeFromBlob(key);
     const fingerprint = fingerprintSha256(key);
@@ -148,11 +182,17 @@ export class SshConnection extends EventEmitter {
       return { verdict: 'mismatch', message };
     }
     if (!interactive) return { verdict: 'rejected', message: '' };
+    timer.pause();
     const trust = await this.opts.askHostKey({ host, port, kind: 'unknown', fingerprint });
+    timer.resume();
     if (!trust) return { verdict: 'rejected', message: '' };
-    mkdirSync(dirname(this.opts.knownHostsPath), { recursive: true });
-    const prefix = text === '' || text.endsWith('\n') ? '' : '\n';
-    appendFileSync(this.opts.knownHostsPath, `${prefix}${knownHostsLine(host, port, type, key)}\n`);
+    try {
+      mkdirSync(dirname(this.opts.knownHostsPath), { recursive: true });
+      const prefix = text === '' || text.endsWith('\n') ? '' : '\n';
+      appendFileSync(this.opts.knownHostsPath, `${prefix}${knownHostsLine(host, port, type, key)}\n`);
+    } catch {
+      // known_hosts не записать (папка только для чтения, OneDrive) — доверяем ключу на эту сессию
+    }
     return { verdict: 'ok', message: '' };
   }
 
@@ -170,8 +210,9 @@ export class SshConnection extends EventEmitter {
       this.setState({ state: 'reconnecting', attempt });
       await new Promise((r) => setTimeout(r, backoffDelay(attempt)));
       if (this.closing) return;
-      const pre = await runPreflight(this.cfg, () => {});
-      if (!pre.ok) continue;
+      // При переподключении достаточно TCP: ping мог бы тормозить каждую попытку на секунды
+      const tcp = await checkTcp(this.cfg.host, this.cfg.port);
+      if (!tcp.ok) continue;
       // Новый неизвестный ключ при переподключении не принимаем без человека
       const r = await this.connectOnce(false);
       if (this.closing) {
@@ -179,7 +220,6 @@ export class SshConnection extends EventEmitter {
         return;
       }
       if (r.ok) {
-        this.pingMs = pre.pingMs;
         this.setState({ state: 'connected', pingMs: this.pingMs });
         this.emit('reconnected');
         return;

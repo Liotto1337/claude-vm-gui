@@ -3,7 +3,7 @@ import { cdPrefix, shellQuote, validateSessionName } from '@shared/quote';
 import { parseSessions, TMUX_LS_FORMAT } from '@shared/tmux-parse';
 import type { SshConnection } from './ssh';
 
-const BAD_NAME = 'Имя сессии: латиница, цифры, точка, дефис и подчёркивание, до 64 символов';
+const BAD_NAME = 'Имя сессии: латиница, цифры, дефис и подчёркивание, до 64 символов';
 const NO_TMUX = 'На ВМ нет tmux. Установите его: sudo apt install tmux';
 
 /**

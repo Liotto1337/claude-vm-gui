@@ -47,6 +47,33 @@ describe.skipIf(!hasTestKey)('SshConnection', () => {
     expect(second.prompts).toHaveLength(0);
   });
 
+  it('человек долго сверяет отпечаток (>15 с) — подключение не обрывается', async () => {
+    const kh = tempKnownHosts();
+    const conn = new SshConnection(testConfig(), {
+      knownHostsPath: kh,
+      askHostKey: () => new Promise((r) => setTimeout(() => r(true), 17_000)),
+    });
+    open.push(conn);
+    expect(await conn.connect()).toEqual({ ok: true, data: undefined });
+    expect(readFileSync(kh, 'utf8')).toMatch(/^127\.0\.0\.1 ssh-/);
+  }, 40_000);
+
+  it('known_hosts не записать — подключается без зависания', async () => {
+    const { conn, prompts } = make('/dev/null/known_hosts');
+    const t = Date.now();
+    expect((await conn.connect()).ok).toBe(true);
+    expect(prompts).toHaveLength(1);
+    expect(Date.now() - t).toBeLessThan(10_000);
+  });
+
+  it('в known_hosts только ключ RSA — сервер не может подсунуть другой тип', async () => {
+    const kh = tempKnownHosts();
+    writeFileSync(kh, readFileSync('tests/fixtures/kh_rsa'));
+    const { conn, prompts } = make(kh);
+    expect((await conn.connect()).ok).toBe(true);
+    expect(prompts).toHaveLength(0);
+  });
+
   it('отказ доверять ключу — HOSTKEY_REJECTED', async () => {
     const { conn } = make(tempKnownHosts(), false);
     const r = await conn.connect();

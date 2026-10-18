@@ -112,6 +112,11 @@ test('claude не запущен — плашка и кнопка «Запуст
   const { app, page } = await openWith([]);
   try {
     await expect(page.getByText('claude не запущен')).toBeVisible();
+    // Пока claude не запущен, отправлять некуда: текст попал бы в bash
+    await page.getByLabel('Сообщение для Claude').fill('echo PWNED');
+    await expect(page.getByRole('button', { name: 'Отправить' })).toBeDisabled();
+    await page.getByLabel('Сообщение для Claude').press('Enter');
+    await expect.poll(() => pane(name)).not.toContain('PWNED');
     // Вместо настоящего claude — функция оболочки
     execFileSync('tmux', ['send-keys', '-t', `=${name}:`, 'claude() { echo fake-claude-started; }', 'Enter']);
     await page.getByRole('button', { name: 'Запустить claude' }).click();
@@ -130,6 +135,21 @@ test('открыто меню Claude Code — сообщение не уходи
     await expect(page.getByRole('alert')).toContainText('Ответьте прямо в терминале');
     await expect(box).toHaveValue('не отправлять');
     expect(pane(name)).not.toContain('не отправлять');
+  } finally {
+    await app.close();
+  }
+});
+
+test('двойной Enter отправляет сообщение один раз', async () => {
+  const { app, page } = await openWith(['cat'], { CVG_FAKE_CLAUDE: '1' });
+  try {
+    const box = page.getByLabel('Сообщение для Claude');
+    await box.fill('ровно-один-раз');
+    await box.press('Enter');
+    await box.press('Enter');
+    await expect(box).toHaveValue('');
+    await page.waitForTimeout(1500);
+    expect(pane(name).match(/ровно-один-раз/g)?.length).toBe(2); // ввод + эхо cat
   } finally {
     await app.close();
   }

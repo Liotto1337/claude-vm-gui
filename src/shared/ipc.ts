@@ -14,6 +14,7 @@ export type ErrorCode =
   | 'NO_SESSION'
   | 'NOT_CONNECTED'
   | 'PROMPT_OPEN'
+  | 'NO_CLAUDE'
   | 'UPLOAD_TOO_BIG'
   | 'UPLOAD_FAILED'
   | 'HINTS_FAILED'

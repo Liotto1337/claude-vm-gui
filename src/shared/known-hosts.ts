@@ -45,3 +45,23 @@ export function checkKnownHosts(text: string, host: string, port: number, keyTyp
 export function knownHostsLine(host: string, port: number, keyType: string, key: Buffer): string {
   return `${hostPattern(host, port)} ${keyType} ${key.toString('base64')}`;
 }
+
+/** Типы ключей, уже записанные для хоста в known_hosts. */
+export function knownTypesFor(text: string, host: string, port: number): string[] {
+  const types = new Set<string>();
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (line === '' || line.startsWith('#') || line.startsWith('@')) continue;
+    const [hosts, type, b64] = line.split(/\s+/);
+    if (hosts && type && b64 && hostMatches(hosts, host, port)) types.add(type);
+  }
+  return [...types];
+}
+
+/**
+ * Алгоритмы ключа сервера для ssh2. Если хост уже известен, разрешаем только его типы —
+ * как HostKeyAlgorithms в OpenSSH: иначе сервер мог бы прислать ключ нового типа и обойти проверку.
+ */
+export function hostKeyAlgorithms(types: string[]): string[] {
+  return types.flatMap((t) => (t === 'ssh-rsa' ? ['rsa-sha2-512', 'rsa-sha2-256', 'ssh-rsa'] : [t]));
+}

@@ -79,6 +79,30 @@ describe.skipIf(!hasTestKey)('подсказки и загрузка карти�
     expect(p.ok && p.data).toEqual(['main.py']);
   });
 
+  it('кириллические имена файлов в git-репозитории — как есть', async () => {
+    const repo = mkdtempSync(join(homedir(), 'cvg-test-cyr-'));
+    tmpDirs.push(repo);
+    writeFileSync(join(repo, 'Документ.md'), '');
+    execFileSync('git', ['init', '-q'], { cwd: repo });
+    execFileSync('git', ['add', '.'], { cwd: repo });
+    const r = await hints.files(repo);
+    expect(r.ok && r.data).toEqual(['Документ.md']);
+  });
+
+  it('подсказки не запускают хуки и MCP проекта (папка может быть чужой)', async () => {
+    const repo = mkdtempSync(join(homedir(), 'cvg-test-hooks-'));
+    tmpDirs.push(repo);
+    const marker = join(repo, 'hook-ran');
+    mkdirSync(join(repo, '.claude'));
+    writeFileSync(
+      join(repo, '.claude/settings.json'),
+      JSON.stringify({ hooks: { SessionStart: [{ hooks: [{ type: 'command', command: `touch ${marker}` }] }] } }),
+    );
+    const r = await hints.get(repo);
+    expect(r.ok && r.data.commands.length).toBeGreaterThan(0);
+    expect(() => statSync(marker)).toThrow();
+  });
+
   it('папки для новой сессии', async () => {
     const dir = mkdtempSync(join(homedir(), 'cvg-test-dirs-'));
     tmpDirs.push(dir);

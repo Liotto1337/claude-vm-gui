@@ -8,6 +8,9 @@ import { TmuxService } from '../../src/main/tmux';
 import type { ExitReason } from '../../src/shared/ipc';
 import { hasTestKey, tempKnownHosts, testConfig, testSessionName } from './helpers';
 
+// Процесс cat в тестовых сессиях считается claude (как CVG_FAKE_CLAUDE в E2E)
+process.env.CVG_FAKE_CLAUDE = '1';
+
 const ODD_DIR = join(homedir(), "cvg test 'q'");
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -131,6 +134,35 @@ describe.skipIf(!hasTestKey)('tmux и терминал', () => {
     const pane = await capture(name);
     expect(pane).not.toContain('опасный текст');
     expect(pane).not.toContain('/model');
+    term.close();
+  });
+
+  it('в сессии bash, а не claude — текст не уходит в shell (NO_CLAUDE)', async () => {
+    const name = await newSession('bash');
+    const term = new TerminalService(conn, tmux);
+    expect((await term.open(name, 100, 30)).ok).toBe(true);
+    await sleep(300);
+    expect(await term.send('echo PWNED-$((40+2))', [])).toMatchObject({ ok: false, error: { code: 'NO_CLAUDE' } });
+    expect(await term.setModel('sonnet')).toMatchObject({ ok: false, error: { code: 'NO_CLAUDE' } });
+    await sleep(500);
+    const pane = await capture(name);
+    expect(pane).not.toContain('PWNED');
+    expect(pane).not.toContain('/model');
+    term.close();
+  });
+
+  it('два быстрых open подряд — остаётся один канал, к последней сессии', async () => {
+    const a = await newSession('race-a');
+    const b = await newSession('race-b');
+    const term = new TerminalService(conn, tmux);
+    const [ra, rb] = await Promise.all([term.open(a, 80, 24), term.open(b, 80, 24)]);
+    expect(ra.ok && rb.ok).toBe(true);
+    await sleep(700);
+    const r = await tmux.list();
+    const attached = (n: string) => (r.ok ? r.data.find((s) => s.name === n)?.attachedClients : -1);
+    expect(attached(a)).toBe(0);
+    expect(attached(b)).toBe(1);
+    expect(term.current).toBe(b);
     term.close();
   });
 
