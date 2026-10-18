@@ -9,6 +9,7 @@ export type ErrorCode =
   | 'HOSTKEY_REJECTED'
   | 'NO_TMUX'
   | 'BAD_NAME'
+  | 'BAD_DIR'
   | 'SESSION_EXISTS'
   | 'NO_SESSION'
   | 'NOT_CONNECTED'
