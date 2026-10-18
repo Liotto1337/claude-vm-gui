@@ -116,3 +116,52 @@
   box-sizing: border-box;
 }
 .brand { display: flex; align-items: center; gap: 10px; padding: 4px 8px; font-family: var(--font-serif); font-size: 20px; font-weight: 500; }
+.ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.btn-sm { min-height: 34px; padding: 0 12px; font-size: 13px; display: inline-flex; align-items: center; gap: 6px; }
+.btn-danger { background: var(--danger); color: #fff; border-color: transparent; }
+.btn-danger:hover { background: var(--danger); opacity: 0.9; }
+.btn-ghost { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 10px; border-radius: 8px; border: none; background: transparent; color: var(--text-2); font: inherit; cursor: pointer; }
+.btn-ghost:hover { background: var(--hover); color: var(--text); }
+.hint-error { color: var(--danger); }
+.check { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+.check input { width: 18px; height: 18px; accent-color: var(--accent-strong); }
+
+.dot { width: 8px; height: 8px; border-radius: 50%; flex: none; box-sizing: border-box; }
+.dot-ok { background: var(--ok); }
+.dot-warn { background: var(--warn); }
+.dot-claude { width: 6px; height: 6px; background: var(--accent); }
+.dot-idle { width: 6px; height: 6px; border: 1px solid var(--text-3); }
+
+.conn-chip { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; background: var(--panel); border: 0.5px solid var(--border); font-size: 13px; }
+.new-session { display: flex; align-items: center; gap: 8px; min-height: 44px; background: var(--panel); }
+.section-label { padding: 0 10px; }
+.session-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; overflow-y: auto; flex: 1; min-height: 0; }
+.session-item { width: 100%; display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border-radius: 8px; border: none; background: transparent; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.session-item:hover { background: var(--hover); }
+.session-item[aria-current='page'] { background: var(--hover); }
+.session-item[aria-current='page'] .session-name { font-weight: 600; }
+.session-line { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.session-name { flex: 1; }
+.session-cwd { font-size: 12px; color: var(--text-2); padding-left: 14px; }
+.tag { font-size: 11px; color: var(--text-2); border: 0.5px solid var(--border-strong); border-radius: 4px; padding: 1px 5px; white-space: nowrap; }
+.settings-btn { margin-top: auto; }
+
+.main-column { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.session-header { display: flex; align-items: center; gap: 16px; padding: 14px 24px; min-height: 36px; }
+.session-title { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.session-title h1 { margin: 0; font-family: var(--font-serif); font-size: 20px; font-weight: 500; }
+.terminal-card { position: relative; flex: 1; min-height: 0; margin: 0 24px 16px; background: var(--term-bg); border: 0.5px solid var(--border); border-radius: 12px; padding: 14px 4px 10px 16px; box-sizing: border-box; overflow: hidden; }
+.terminal-host { width: 100%; height: 100%; }
+.terminal-host .xterm-viewport { background: transparent !important; }
+.terminal-exit { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: color-mix(in srgb, var(--term-bg) 85%, transparent); font-size: 15px; }
+.terminal-exit p { margin: 0; }
+.empty-state { flex: 1; display: grid; place-items: center; color: var(--text-2); font-size: 15px; }
+
+.banner { display: flex; align-items: center; gap: 12px; margin: 12px 24px 0; padding: 10px 14px; border-radius: 10px; background: color-mix(in srgb, var(--warn) 14%, var(--panel)); border: 0.5px solid var(--border); font-size: 13px; }
+.banner-error { background: color-mix(in srgb, var(--danger) 12%, var(--panel)); }
+
+.popup { list-style: none; margin: 0; padding: 6px; background: var(--panel); border: 0.5px solid var(--border); border-radius: 12px; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 1px; }
+.popup-item { padding: 8px 10px; border-radius: 8px; cursor: pointer; }
+.popup-item:hover, .popup-item[aria-selected='true'] { background: var(--hover); }
+.dir-field { position: relative; }
+.dir-popup { position: absolute; top: 70px; left: 0; right: 0; z-index: 5; font-size: 13px; max-height: 260px; overflow-y: auto; }

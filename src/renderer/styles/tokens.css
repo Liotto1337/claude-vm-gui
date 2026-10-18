@@ -19,6 +19,7 @@
   --overlay: rgba(20, 20, 19, 0.35);
   --btn-dark-bg: #141413;
   --btn-dark-text: #faf9f5;
+  --term-bg: #ffffff;
   color-scheme: light;
 }
 
@@ -41,6 +42,7 @@
   --overlay: rgba(0, 0, 0, 0.5);
   --btn-dark-bg: #faf9f5;
   --btn-dark-text: #141413;
+  --term-bg: #1f1e1d;
   color-scheme: dark;
 }
 

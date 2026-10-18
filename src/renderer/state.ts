@@ -110,3 +110,40 @@ export async function init(): Promise<void> {
   setState({ config, systemTheme, view: config ? 'connect' : 'settings' });
   if (config) void connect();
 }
+
+export async function refreshSessions(): Promise<void> {
+  const r = await api.tmux.list();
+  if (r.ok) setState({ sessions: r.data });
+}
+
+export function openSession(name: string | null): void {
+  setState({ current: name });
+  const cfg = state.config;
+  if (cfg && name && cfg.lastSession !== name) {
+    const next = { ...cfg, lastSession: name };
+    void api.config.save(next).then((r) => r.ok && setState({ config: next }));
+  }
+}
+
+export async function createSession(name: string, dir: string, startClaude: boolean): Promise<string | null> {
+  const r = await api.tmux.create(name, dir, startClaude);
+  if (!r.ok) return r.error.message;
+  await refreshSessions();
+  openSession(name);
+  return null;
+}
+
+export async function killSession(name: string): Promise<string | null> {
+  const r = await api.tmux.kill(name);
+  if (state.current === name) setState({ current: null });
+  await refreshSessions();
+  return r.ok ? null : r.error.message;
+}
+
+/** Папка сессии для показа: домашняя папка пользователя сокращается до «~». */
+export function shortPath(cwd: string): string {
+  const user = state.config?.username;
+  const home = user === 'root' ? '/root' : user ? `/home/${user}` : null;
+  if (home && (cwd === home || cwd.startsWith(`${home}/`))) return `~${cwd.slice(home.length)}`;
+  return cwd;
+}

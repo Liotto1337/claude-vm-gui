@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { _electron, type ElectronApplication, type Page } from '@playwright/test';
 import { existsSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
@@ -14,6 +15,13 @@ export function withConfig(cfg: Record<string, unknown>): string {
 }
 
 export const tempKnownHostsPath = () => join(mkdtempSync(join(tmpdir(), 'cvg-kh-')), 'known_hosts');
+
+/** known_hosts, где ключ localhost уже записан — подключение без диалога «Новый сервер». */
+export function trustedKnownHosts(): string {
+  const path = tempKnownHostsPath();
+  writeFileSync(path, execFileSync('ssh-keyscan', ['-t', 'ed25519', '127.0.0.1'], { stdio: ['ignore', 'pipe', 'ignore'] }));
+  return path;
+}
 
 export interface Launched { app: ElectronApplication; page: Page; userData: string }
 
