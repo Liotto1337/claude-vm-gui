@@ -50,6 +50,7 @@ const api: Api = {
   } as Api['term'],
   hints: { get: invoke('hints:get'), files: invoke('hints:files'), dirs: invoke('hints:dirs') } as Api['hints'],
   upload: { image: invoke('upload:image'), onProgress: on('upload:progress') } as Api['upload'],
+  clipboard: { read: invoke('clipboard:read'), write: send('clipboard:write') } as Api['clipboard'],
   platform: { theme: invoke('platform:theme'), onThemeChange: on('platform:themeChange') } as Api['platform'],
 };
 

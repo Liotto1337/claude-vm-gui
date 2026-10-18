@@ -3,6 +3,7 @@ import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
 import type { ExitReason } from '@shared/ipc';
+import { parseOsc52 } from '@shared/osc52';
 import { api } from '../api';
 import { refreshSessions, useAppState } from '../state';
 import { terminalTheme } from '../terminal-theme';
@@ -41,12 +42,24 @@ export function TerminalView({ name }: { name: string }) {
     const copySelection = () => {
       const text = term.getSelection();
       if (!text) return false;
-      void navigator.clipboard.writeText(text).catch(() => undefined);
+      api.clipboard.write(text);
       return true;
     };
     const pasteClipboard = () => {
-      void navigator.clipboard.readText().then((t) => t && term.paste(t)).catch(() => undefined);
+      void api.clipboard.read().then((t) => t && term.paste(t)).catch(() => undefined);
     };
+    // Выделение мышью в Claude Code и копирование в tmux приходят как OSC 52 — кладём текст в буфер Windows
+    const osc52 = term.parser.registerOscHandler(52, (data) => {
+      const text = parseOsc52(data);
+      if (text) api.clipboard.write(text);
+      return true;
+    });
+    // Claude Code включает отслеживание всех движений мыши; xterm.js считает их вводом и снимает
+    // выделение (Shift+мышь) при первом же движении. Пока выделение есть, движение без кнопок не передаём.
+    const keepSelection = (e: MouseEvent) => {
+      if (e.buttons === 0 && term.hasSelection()) e.stopPropagation();
+    };
+    el.addEventListener('mousemove', keepSelection, true);
     // Ctrl+C копирует, когда есть выделение (иначе это прерывание для claude); Ctrl+Shift+C/V — всегда.
     term.attachCustomKeyEventHandler((e) => {
       if (e.type !== 'keydown' || !e.ctrlKey || e.altKey || e.metaKey) return true;
@@ -88,6 +101,8 @@ export function TerminalView({ name }: { name: string }) {
     return () => {
       ro.disconnect();
       el.removeEventListener('contextmenu', onContext);
+      el.removeEventListener('mousemove', keepSelection, true);
+      osc52.dispose();
       input.dispose();
       offData();
       offExit();

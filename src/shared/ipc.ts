@@ -123,6 +123,7 @@ export interface Api {
     image(id: string, bytes: Uint8Array, ext: ImageExt): Promise<Result<{ remotePath: string }>>;
     onProgress(cb: (p: UploadProgress) => void): Unsubscribe;
   };
+  clipboard: { read(): Promise<string>; write(text: string): void };
   platform: {
     theme(): Promise<'light' | 'dark'>;
     onThemeChange(cb: (t: 'light' | 'dark') => void): Unsubscribe;

@@ -1,4 +1,4 @@
-import { app, ipcMain, nativeTheme, type BrowserWindow } from 'electron';
+import { app, clipboard, ipcMain, nativeTheme, type BrowserWindow } from 'electron';
 import type { Result, VmConfig } from '@shared/ipc';
 import { loadConfig, saveConfig } from './config';
 
@@ -37,7 +37,11 @@ export class IpcHub {
     this.handle('config:save', (c: VmConfig): Result<void> => saveConfig(this.paths.userDataDir, c));
     this.handle('platform:theme', () => (nativeTheme.shouldUseDarkColors ? 'dark' : 'light'));
     nativeTheme.on('updated', () => this.emit('platform:themeChange', nativeTheme.shouldUseDarkColors ? 'dark' : 'light'));
-
+    // Буфер обмена Windows через main: navigator.clipboard в renderer не пишет, пока окно не в фокусе
+    this.handle('clipboard:read', () => clipboard.readText());
+    this.listen('clipboard:write', (text: string) => {
+      if (typeof text === 'string' && text) clipboard.writeText(text);
+    });
   }
 }
 
