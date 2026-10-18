@@ -1,0 +1,3 @@
+#!/bin/sh
+# Отклоняет коммит, если в файлах есть адрес ВМ из vm.config.json
+exec node scripts/check-no-host.mjs

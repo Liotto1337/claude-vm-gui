@@ -1,0 +1,73 @@
+/* Палитра бренда Anthropic. Значения — из спецификации, раздел «Внешний вид». */
+:root,
+[data-theme='light'] {
+  --bg: #faf9f5;
+  --panel: #ffffff;
+  --sidebar: #f5f4ed;
+  --text: #141413;
+  --text-2: #5e5d59;
+  --text-3: #87867f;
+  --border: rgba(31, 30, 29, 0.15);
+  --border-strong: rgba(31, 30, 29, 0.3);
+  --hover: rgba(115, 114, 108, 0.12);
+  --accent: #d97757;
+  --accent-strong: #c6613f;
+  --ok: #558a42;
+  --warn: #a86b1f;
+  --danger: #b53333;
+  --shadow: 0 6px 24px rgba(20, 20, 19, 0.08);
+  --overlay: rgba(20, 20, 19, 0.35);
+  --btn-dark-bg: #141413;
+  --btn-dark-text: #faf9f5;
+  color-scheme: light;
+}
+
+[data-theme='dark'] {
+  --bg: #262624;
+  --panel: #30302e;
+  --sidebar: #1f1e1d;
+  --text: #faf9f5;
+  --text-2: #b0aea5;
+  --text-3: #87867f;
+  --border: rgba(250, 249, 245, 0.12);
+  --border-strong: rgba(250, 249, 245, 0.22);
+  --hover: rgba(250, 249, 245, 0.08);
+  --accent: #d97757;
+  --accent-strong: #c6613f;
+  --ok: #7faf6a;
+  --warn: #d9a05b;
+  --danger: #e07a6b;
+  --shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+  --overlay: rgba(0, 0, 0, 0.5);
+  --btn-dark-bg: #faf9f5;
+  --btn-dark-text: #141413;
+  color-scheme: dark;
+}
+
+:root {
+  --font-ui: 'Segoe UI', system-ui, -apple-system, Roboto, Helvetica, Arial, sans-serif;
+  --font-serif: 'Source Serif 4', Georgia, 'Times New Roman', serif;
+  --font-mono: 'JetBrains Mono', Consolas, 'Courier New', monospace;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+
+.app-placeholder {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  font-family: var(--font-serif);
+}

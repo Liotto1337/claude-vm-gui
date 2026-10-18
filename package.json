@@ -1,0 +1,42 @@
+{
+  "name": "claude-vm-gui",
+  "productName": "Claude VM",
+  "version": "0.1.0",
+  "description": "Windows-клиент для Claude Code на ВМ: SSH, tmux и интерфейс в стиле claude.ai",
+  "author": "Liotto1337 <egorstep.0801@gmail.com>",
+  "license": "MIT",
+  "main": "./out/main/index.js",
+  "scripts": {
+    "prepare": "git config core.hooksPath .githooks || true",
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
+    "test": "vitest run --project unit",
+    "test:int": "vitest run --project integration",
+    "test:e2e": "electron-vite build && playwright test",
+    "build:win": "electron-vite build && electron-builder --win"
+  },
+  "dependencies": {
+    "@fontsource/jetbrains-mono": "5.3.0",
+    "@fontsource/source-serif-4": "5.3.1",
+    "@xterm/addon-fit": "0.11.0",
+    "@xterm/xterm": "6.0.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "ssh2": "1.17.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.1",
+    "@types/node": "22.19.1",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.2.3",
+    "@types/ssh2": "1.15.6",
+    "@vitejs/plugin-react": "6.1.2",
+    "electron": "44.9.0",
+    "electron-builder": "26.15.3",
+    "electron-vite": "6.0.0",
+    "typescript": "5.9.3",
+    "vite": "8.3.4",
+    "vitest": "5.0.5"
+  }
+}
