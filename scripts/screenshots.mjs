@@ -108,5 +108,5 @@ try {
 } finally {
   tmux('kill-server');
   // Загруженную демо-картинку убираем
-  execFileSync('sh', ['-c', 'find "$HOME/.cache/claude-vm-gui/uploads" -type f -mmin -10 -size -1k -delete 2>/dev/null; true']);
+  execFileSync('sh', ['-c', 'find "$HOME/.cache/claude-vm-gui/uploads" -type f -mmin -10 -size -1024c -delete 2>/dev/null; true']);
 }

@@ -121,6 +121,20 @@ test('claude не запущен — плашка и кнопка «Запуст
   }
 });
 
+test('открыто меню Claude Code — сообщение не уходит, видна подсказка', async () => {
+  const { app, page } = await openWith(['sh', '-c', "printf ' ❯ 1. Yes\\n   2. No\\n Esc to cancel\\n'; exec cat"], { CVG_FAKE_CLAUDE: '1' });
+  try {
+    const box = page.getByLabel('Сообщение для Claude');
+    await box.fill('не отправлять');
+    await box.press('Enter');
+    await expect(page.getByRole('alert')).toContainText('Ответьте прямо в терминале');
+    await expect(box).toHaveValue('не отправлять');
+    expect(pane(name)).not.toContain('не отправлять');
+  } finally {
+    await app.close();
+  }
+});
+
 test('отправка недоступна, пока поле пустое', async () => {
   const { app, page } = await openWith(['cat'], { CVG_FAKE_CLAUDE: '1' });
   try {

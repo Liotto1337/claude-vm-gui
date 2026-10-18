@@ -115,6 +115,25 @@ describe.skipIf(!hasTestKey)('tmux и терминал', () => {
     expect((await term.send('x', [])).ok).toBe(false);
   });
 
+  it('открыто меню Claude Code — отправка и /model блокируются, в терминал ничего не уходит', async () => {
+    const name = testSessionName('prompt');
+    created.push(name);
+    await conn.exec(
+      `tmux new-session -d -s ${name} "printf '\\n Do you want to proceed?\\n ❯ 1. Yes\\n   2. No\\n\\n Esc to cancel\\n'; cat"`,
+    );
+    const term = new TerminalService(conn, tmux);
+    expect((await term.open(name, 100, 30)).ok).toBe(true);
+    await sleep(300);
+    expect(await term.send('опасный текст', [])).toMatchObject({ ok: false, error: { code: 'PROMPT_OPEN' } });
+    expect(await term.setModel('sonnet')).toMatchObject({ ok: false, error: { code: 'PROMPT_OPEN' } });
+    expect(await term.setEffort('low')).toMatchObject({ ok: false, error: { code: 'PROMPT_OPEN' } });
+    await sleep(300);
+    const pane = await capture(name);
+    expect(pane).not.toContain('опасный текст');
+    expect(pane).not.toContain('/model');
+    term.close();
+  });
+
   it('после обрыва SSH терминал сам возвращается в ту же сессию', async () => {
     const name = await newSession('reattach');
     const own = new SshConnection(testConfig(), { knownHostsPath: tempKnownHosts(), askHostKey: async () => true });

@@ -13,6 +13,7 @@ export type ErrorCode =
   | 'SESSION_EXISTS'
   | 'NO_SESSION'
   | 'NOT_CONNECTED'
+  | 'PROMPT_OPEN'
   | 'UPLOAD_TOO_BIG'
   | 'UPLOAD_FAILED'
   | 'HINTS_FAILED'

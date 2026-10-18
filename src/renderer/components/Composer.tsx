@@ -248,7 +248,10 @@ export function Composer({ session }: { session: TmuxSession }) {
               choices={models.map((m) => ({ value: m.value, label: m.displayName, description: m.description }))}
               selected={choice.model}
               onSelect={(c) =>
-                void api.term.setModel(c.value).then((r) => r.ok && rememberChoice(session.name, { model: c.value, modelLabel: c.label }))
+                void api.term.setModel(c.value).then((r) => {
+                  setSendError(r.ok ? null : r.error.message);
+                  if (r.ok) rememberChoice(session.name, { model: c.value, modelLabel: c.label });
+                })
               }
             />
             <ChoiceMenu
@@ -257,7 +260,12 @@ export function Composer({ session }: { session: TmuxSession }) {
               title="Effort · отправит /effort"
               choices={efforts.map((e) => ({ value: e, label: e }))}
               selected={choice.effort}
-              onSelect={(c) => void api.term.setEffort(c.value).then((r) => r.ok && rememberChoice(session.name, { effort: c.value }))}
+              onSelect={(c) =>
+                void api.term.setEffort(c.value).then((r) => {
+                  setSendError(r.ok ? null : r.error.message);
+                  if (r.ok) rememberChoice(session.name, { effort: c.value });
+                })
+              }
             />
             <button type="button" className="send-btn" aria-label="Отправить" disabled={!canSend} onClick={() => void send()}>
               <IconArrowUp />

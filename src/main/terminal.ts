@@ -5,7 +5,11 @@ import { fail, ok, type ExitReason, type Result } from '@shared/ipc';
 import { bracketedPaste, slashCommand } from '@shared/paste';
 import { validateSessionName } from '@shared/quote';
 import type { SshConnection } from './ssh';
-import { exactTarget, tmuxCmd, type TmuxService } from './tmux';
+import { exactPane, exactTarget, tmuxCmd, type TmuxService } from './tmux';
+
+const DIALOG_FOOTER = /Enter to confirm|Esc to cancel/i;
+const PROMPT_OPEN_TEXT =
+  'В терминале открыто меню Claude Code (например, запрос разрешения). Ответьте прямо в терминале и повторите.';
 
 /**
  * Терминал открытой tmux-сессии: канал `tmux attach` с PTY.
@@ -77,7 +81,24 @@ export class TerminalService extends EventEmitter {
     this.stream?.setWindow(rows, cols, 0, 0);
   }
 
-  private writeChecked(data: () => string): Result<void> {
+  /**
+   * Открыто ли в терминале меню Claude Code (запрос разрешения, «доверять папке?»).
+   * В таком меню Enter выбрал бы пункт по умолчанию — например, разрешил бы инструмент.
+   */
+  private async promptOpen(): Promise<boolean> {
+    if (!this.session) return false;
+    try {
+      const r = await this.conn.exec(`${tmuxCmd()} capture-pane -p -t ${exactPane(this.session)}`);
+      const tail = r.stdout.split('\n').filter((l) => l.trim() !== '').slice(-12).join('\n');
+      return DIALOG_FOOTER.test(tail);
+    } catch {
+      return false;
+    }
+  }
+
+  private async writeChecked(data: () => string): Promise<Result<void>> {
+    if (!this.stream) return fail('NO_SESSION', 'Сессия не открыта');
+    if (await this.promptOpen()) return fail('PROMPT_OPEN', PROMPT_OPEN_TEXT);
     if (!this.stream) return fail('NO_SESSION', 'Сессия не открыта');
     try {
       this.stream.write(data());
