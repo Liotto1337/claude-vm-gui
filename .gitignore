@@ -1,0 +1,14 @@
+# Адрес и доступ к ВМ — только локально
+vm.config.json
+.env
+.env.*
+
+node_modules/
+out/
+dist/
+release/
+test-results/
+playwright-report/
+*.log
+.DS_Store
+Thumbs.db
