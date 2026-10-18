@@ -90,7 +90,21 @@ export class AppController {
       askHostKey: (p) => this.askHostKey(p),
       onPreflight: (e) => this.hub.emit('connection:preflight', e),
     });
-    conn.on('state', (st) => this.hub.emit('connection:state', st));
+    // После обрыва «Подключено» показываем, только когда терминал снова в сессии — иначе ввод потеряется
+    let reattaching = false;
+    conn.on('lost', () => {
+      reattaching = this.s?.term.current != null;
+    });
+    conn.on('state', (st) => {
+      if (st.state === 'connected' && reattaching) {
+        this.s?.term.once('reattached', () => {
+          reattaching = false;
+          this.hub.emit('connection:state', st);
+        });
+        return;
+      }
+      this.hub.emit('connection:state', st);
+    });
     const r = await conn.connect();
     if (!r.ok) {
       conn.close();
@@ -118,6 +132,11 @@ export class AppController {
     this.s = { conn, tmux, term, hints, upload, stopPolling };
     void upload.cleanup();
     return ok(undefined);
+  }
+
+  /** Только для E2E (CVG_TEST_HOOKS=1): обрыв SSH, как при потере сети. */
+  simulateDrop(): void {
+    (this.s?.conn as unknown as { client?: { end(): void } } | undefined)?.client?.end();
   }
 
   disconnect(): void {

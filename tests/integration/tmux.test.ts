@@ -115,6 +115,27 @@ describe.skipIf(!hasTestKey)('tmux и терминал', () => {
     expect((await term.send('x', [])).ok).toBe(false);
   });
 
+  it('после обрыва SSH терминал сам возвращается в ту же сессию', async () => {
+    const name = await newSession('reattach');
+    const own = new SshConnection(testConfig(), { knownHostsPath: tempKnownHosts(), askHostKey: async () => true });
+    expect((await own.connect()).ok).toBe(true);
+    const term = new TerminalService(own, new TmuxService(own));
+    const exits: ExitReason[] = [];
+    term.on('exit', (r: ExitReason) => exits.push(r));
+    expect((await term.open(name, 80, 24)).ok).toBe(true);
+    const back = new Promise<void>((res) => own.once('reconnected', () => res()));
+    (own as unknown as { client: { end(): void } }).client.end();
+    await back;
+    expect(await waitFor(async () => {
+      term.write('echo re-$((1+1))\r');
+      await sleep(300);
+      return (await capture(name)).includes('re-2');
+    })).toBe(true);
+    expect(exits).toEqual(['connection-lost']);
+    term.close();
+    own.close();
+  });
+
   it('startClaude набирает claude в сессии', async () => {
     const name = await newSession('start');
     // Подменяем claude функцией оболочки, чтобы не запускать настоящий

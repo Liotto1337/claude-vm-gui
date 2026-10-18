@@ -5,7 +5,7 @@ import { fail, ok, type ExitReason, type Result } from '@shared/ipc';
 import { bracketedPaste, slashCommand } from '@shared/paste';
 import { validateSessionName } from '@shared/quote';
 import type { SshConnection } from './ssh';
-import { exactTarget, type TmuxService } from './tmux';
+import { exactTarget, tmuxCmd, type TmuxService } from './tmux';
 
 /**
  * Терминал открытой tmux-сессии: канал `tmux attach` с PTY.
@@ -19,8 +19,10 @@ export class TerminalService extends EventEmitter {
   constructor(private readonly conn: SshConnection, private readonly tmux: TmuxService) {
     super();
     // После автопереподключения возвращаемся в ту же сессию
+    // Событие `reattached` — терминал снова подключён (или подключать было нечего)
     conn.on('reconnected', () => {
-      if (this.session) void this.open(this.session, this.size.cols, this.size.rows);
+      if (!this.session) return void this.emit('reattached');
+      void this.open(this.session, this.size.cols, this.size.rows).finally(() => this.emit('reattached'));
     });
   }
 
@@ -35,7 +37,7 @@ export class TerminalService extends EventEmitter {
     this.size = { cols, rows };
     let stream: ClientChannel;
     try {
-      stream = await this.conn.openPty(`tmux attach-session -t ${exactTarget(name)}`, cols, rows);
+      stream = await this.conn.openPty(`${tmuxCmd()} attach-session -t ${exactTarget(name)}`, cols, rows);
     } catch (e) {
       return fail('NOT_CONNECTED', (e as Error).message);
     }

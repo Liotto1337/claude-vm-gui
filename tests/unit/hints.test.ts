@@ -39,5 +39,10 @@ describe('parseInitialize', () => {
   it('модели с уровнями effort', () => {
     expect(hints.models.find((m) => m.value === 'opus')?.efforts).toContain('high');
   });
+  it('служебные команды «__…» не показываются', () => {
+    const r = parseInitialize({ response: { response: { commands: [{ name: '__remote-workflow', description: 'x' }, { name: 'model', description: 'y' }] } } });
+    expect(r.commands.map((c) => c.name)).not.toContain('__remote-workflow');
+    expect(r.commands.map((c) => c.name)).toContain('model');
+  });
   it('мусор на входе — пустой ответ без падения', () => expect(parseInitialize({ x: 1 })).toEqual({ commands: BUILTIN_COMMANDS, models: [] }));
 });

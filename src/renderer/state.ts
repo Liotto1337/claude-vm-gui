@@ -154,3 +154,10 @@ export function shortPath(cwd: string): string {
 export function rememberChoice(session: string, patch: { model?: string; modelLabel?: string; effort?: string }): void {
   setState({ choices: { ...state.choices, [session]: { ...state.choices[session], ...patch } } });
 }
+
+const demoHost = new URLSearchParams(location.search).get('demoHost');
+
+/** Адрес ВМ для показа; на демо-скриншотах подменяется. */
+export function displayHost(host: string): string {
+  return demoHost ?? host;
+}

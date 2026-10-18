@@ -34,8 +34,10 @@ function createWindow(): BrowserWindow {
   });
   win.webContents.on('will-navigate', (e) => e.preventDefault());
 
-  if (process.env.ELECTRON_RENDERER_URL) void win.loadURL(process.env.ELECTRON_RENDERER_URL);
-  else void win.loadFile(join(__dirname, '../renderer/index.html'));
+  // CVG_DEMO_HOST — показывать этот адрес вместо настоящего (скриншоты для документации)
+  const query: Record<string, string> = process.env.CVG_DEMO_HOST ? { demoHost: process.env.CVG_DEMO_HOST } : {};
+  if (process.env.ELECTRON_RENDERER_URL) void win.loadURL(`${process.env.ELECTRON_RENDERER_URL}?${new URLSearchParams(query)}`);
+  else void win.loadFile(join(__dirname, '../renderer/index.html'), { query });
   return win;
 }
 
@@ -49,6 +51,9 @@ app.whenReady().then(() => {
   controller.register();
   hub.attach(createWindow());
   app.on('before-quit', () => controller.disconnect());
+  if (process.env.CVG_TEST_HOOKS === '1') {
+    (globalThis as unknown as { __cvg: object }).__cvg = { dropConnection: () => controller.simulateDrop() };
+  }
 });
 
 app.on('window-all-closed', () => app.quit());

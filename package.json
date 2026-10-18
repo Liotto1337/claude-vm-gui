@@ -14,7 +14,8 @@
     "test": "vitest run --project unit",
     "test:int": "vitest run --project integration",
     "test:e2e": "electron-vite build && playwright test",
-    "build:win": "electron-vite build && electron-builder --win"
+    "build:win": "electron-vite build && electron-builder --win",
+    "screenshots": "electron-vite build && xvfb-run -a -s \"-screen 0 1920x1080x24\" node scripts/screenshots.mjs"
   },
   "dependencies": {
     "@fontsource/jetbrains-mono": "5.3.0",

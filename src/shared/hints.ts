@@ -66,7 +66,7 @@ export function parseInitialize(json: unknown): Hints {
   const rawModels = Array.isArray(r?.models) ? (r.models as RawModel[]) : [];
 
   const commands: HintCommand[] = rawCommands
-    .filter((c) => str(c.name) !== '')
+    .filter((c) => str(c.name) !== '' && !str(c.name).startsWith('__'))
     .map((c) => ({ name: str(c.name), description: str(c.description), argumentHint: str(c.argumentHint), source: 'claude' as const }));
   const seen = new Set(commands.map((c) => c.name));
   for (const b of BUILTIN_COMMANDS) if (!seen.has(b.name)) commands.push(b);

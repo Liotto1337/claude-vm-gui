@@ -1,5 +1,5 @@
 import type { PreflightEvent, PreflightStep } from '@shared/ipc';
-import { connect, openSettings, useAppState } from '../state';
+import { connect, displayHost, openSettings, useAppState } from '../state';
 import { api } from '../api';
 import { IconCheck, IconCross, IconSpinner, IconWarn } from './icons';
 import { Logo } from './Logo';
@@ -33,7 +33,7 @@ export function ConnectScreen() {
       <section className="card connect-card" aria-label="Подключение">
         <div className="field-caption">
           <span className="caption">Сервер</span>
-          <span className="mono">{config ? `${config.username}@${config.host}:${port}` : ''}</span>
+          <span className="mono">{config ? `${config.username}@${displayHost(config.host)}:${port}` : ''}</span>
         </div>
         <ol className="steps">
           {steps.map(({ step, label }) => {

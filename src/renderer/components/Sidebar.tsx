@@ -1,4 +1,4 @@
-import { openSession, openSettings, shortPath, useAppState } from '../state';
+import { displayHost, openSession, openSettings, shortPath, useAppState } from '../state';
 import { IconGear, IconPlus } from './icons';
 import { Logo } from './Logo';
 
@@ -13,7 +13,7 @@ export function Sidebar({ onNewSession }: { onNewSession: () => void }) {
       </div>
       <div className="conn-chip" title={online ? 'Подключено' : 'Нет связи'}>
         <span className={online ? 'dot dot-ok' : 'dot dot-warn'} aria-hidden="true" />
-        <span className="grow ellipsis">{config ? `${config.username}@${config.host}` : ''}</span>
+        <span className="grow ellipsis">{config ? `${config.username}@${displayHost(config.host)}` : ''}</span>
         {online && connection.pingMs != null ? <span className="caption">{connection.pingMs} мс</span> : null}
       </div>
       <button type="button" className="btn new-session" onClick={onNewSession}>
