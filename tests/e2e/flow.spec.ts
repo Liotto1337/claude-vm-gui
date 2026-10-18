@@ -71,7 +71,7 @@ test('сквозной сценарий: сессия, подсказки, ка�
 
     // Модель и effort
     await page.getByRole('button', { name: /^Модель/ }).click();
-    await page.getByRole('menuitemradio', { name: /Sonnet/ }).first().click();
+    await page.getByRole('menuitemradio', { name: /^Sonnet/ }).first().click();
     await page.getByRole('button', { name: /^Effort/ }).click();
     await page.getByRole('menuitemradio', { name: 'low' }).click();
     await expect.poll(pane).toContain('/effort low');

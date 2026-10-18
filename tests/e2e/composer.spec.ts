@@ -96,7 +96,7 @@ test('подсказки, картинка, отправка, модель и ef
 
     // Модель и effort
     await page.getByRole('button', { name: /^Модель/ }).click();
-    await page.getByRole('menuitemradio', { name: /Sonnet/ }).first().click();
+    await page.getByRole('menuitemradio', { name: /^Sonnet/ }).first().click();
     await expect.poll(() => pane(name)).toContain('/model sonnet');
     await expect(page.getByRole('button', { name: /^Модель/ })).toContainText('Sonnet');
     await page.getByRole('button', { name: /^Effort/ }).click();
