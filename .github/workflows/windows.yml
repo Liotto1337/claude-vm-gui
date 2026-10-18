@@ -1,0 +1,37 @@
+name: Windows
+
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Модульные тесты
+        run: npm test
+      - name: Сборка .exe
+        run: npm run build:win
+      - name: Смоук-тест на Windows
+        run: npx playwright test tests/e2e/smoke-win.spec.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: claude-vm-windows
+          path: release/*.exe
+          if-no-files-found: error
+      - name: Релиз
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release/*.exe

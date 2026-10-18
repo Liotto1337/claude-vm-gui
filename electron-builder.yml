@@ -1,0 +1,28 @@
+appId: io.github.liotto1337.claudevm
+productName: Claude VM
+copyright: Copyright © 2026 Liotto1337
+directories:
+  output: release
+  buildResources: build
+files:
+  - out/**
+  - package.json
+asarUnpack:
+  - "**/*.node"
+win:
+  icon: build/icon.ico
+  target:
+    - target: nsis
+      arch: [x64]
+    - target: portable
+      arch: [x64]
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  shortcutName: Claude VM
+  artifactName: Claude VM Setup ${version}.${ext}
+portable:
+  artifactName: Claude VM ${version}.${ext}
+publish: null
