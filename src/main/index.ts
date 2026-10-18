@@ -1,5 +1,6 @@
 import { app, BrowserWindow, session, shell } from 'electron';
 import { join } from 'node:path';
+import { IpcHub, repoDirForDev } from './ipc';
 
 const CSP = "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:";
 
@@ -41,7 +42,9 @@ app.whenReady().then(() => {
   session.defaultSession.webRequest.onHeadersReceived((details, cb) => {
     cb({ responseHeaders: { ...details.responseHeaders, 'Content-Security-Policy': [CSP] } });
   });
-  createWindow();
+  const hub = new IpcHub({ userDataDir: app.getPath('userData'), repoDir: repoDirForDev() });
+  hub.registerBase();
+  hub.attach(createWindow());
 });
 
 app.on('window-all-closed', () => app.quit());
