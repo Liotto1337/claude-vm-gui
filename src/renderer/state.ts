@@ -18,6 +18,8 @@ export interface AppState {
   hints: Hints | null;
   systemTheme: 'light' | 'dark';
   theme: 'light' | 'dark';
+  /** Последний выбор модели и effort в каждой сессии (из этого приложения) */
+  choices: Record<string, { model?: string; modelLabel?: string; effort?: string }>;
 }
 
 let state: AppState = {
@@ -32,6 +34,7 @@ let state: AppState = {
   hints: null,
   systemTheme: 'light',
   theme: 'light',
+  choices: {},
 };
 
 const listeners = new Set<() => void>();
@@ -146,4 +149,8 @@ export function shortPath(cwd: string): string {
   const home = user === 'root' ? '/root' : user ? `/home/${user}` : null;
   if (home && (cwd === home || cwd.startsWith(`${home}/`))) return `~${cwd.slice(home.length)}`;
   return cwd;
+}
+
+export function rememberChoice(session: string, patch: { model?: string; modelLabel?: string; effort?: string }): void {
+  setState({ choices: { ...state.choices, [session]: { ...state.choices[session], ...patch } } });
 }

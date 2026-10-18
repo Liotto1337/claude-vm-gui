@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAppState } from '../state';
 import { Banner } from './Banner';
+import { Composer } from './Composer';
 import { NewSessionDialog } from './NewSessionDialog';
 import { SessionHeader } from './SessionHeader';
 import { Sidebar } from './Sidebar';
@@ -20,6 +21,7 @@ export function MainView() {
           <>
             <SessionHeader session={session} />
             <TerminalView key={session.name} name={session.name} />
+            <Composer key={`c-${session.name}`} session={session} />
           </>
         ) : current ? (
           <>

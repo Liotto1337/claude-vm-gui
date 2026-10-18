@@ -165,3 +165,42 @@
 .popup-item:hover, .popup-item[aria-selected='true'] { background: var(--hover); }
 .dir-field { position: relative; }
 .dir-popup { position: absolute; top: 70px; left: 0; right: 0; z-index: 5; font-size: 13px; max-height: 260px; overflow-y: auto; }
+
+/* Поле ввода */
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.icon-btn { width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; border: 0.5px solid var(--border-strong); background: transparent; color: var(--text-2); cursor: pointer; font-size: 18px; }
+.icon-btn:hover { background: var(--hover); color: var(--text); }
+.link-btn { border: none; background: none; padding: 0; color: inherit; font: inherit; text-decoration: underline; cursor: pointer; }
+.composer-wrap { padding: 4px 24px 14px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.composer-anchor { position: relative; width: 100%; max-width: 780px; }
+.composer { background: var(--panel); border: 0.5px solid var(--border-strong); border-radius: 18px; box-shadow: 0 2px 10px rgba(20, 20, 19, 0.05); padding: 12px 12px 10px 16px; display: flex; flex-direction: column; gap: 8px; }
+.composer:focus-within { border-color: color-mix(in srgb, var(--accent) 60%, var(--border-strong)); }
+.composer textarea { border: none; outline: none; resize: none; font: inherit; font-size: 15px; line-height: 1.5; color: var(--text); background: transparent; padding: 0; max-height: 200px; field-sizing: content; min-height: 44px; }
+.composer textarea::placeholder { color: var(--text-3); }
+.composer-bar { display: flex; align-items: center; gap: 6px; }
+.send-btn { width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; border: none; background: var(--accent-strong); color: #fff; cursor: pointer; }
+.send-btn:disabled { opacity: 0.4; cursor: default; }
+.composer-help { font-size: 12px; color: var(--text-2); }
+.notice { width: 100%; max-width: 780px; box-sizing: border-box; display: flex; align-items: center; gap: 12px; justify-content: space-between; padding: 8px 12px 8px 16px; border-radius: 12px; background: color-mix(in srgb, var(--accent) 10%, var(--panel)); border: 0.5px solid var(--border); font-size: 13px; }
+.hint-popup { position: absolute; left: 0; right: 0; bottom: calc(100% + 8px); z-index: 6; max-height: 320px; overflow-y: auto; }
+.hint-item { display: flex; gap: 14px; align-items: baseline; }
+.hint-label { min-width: 120px; font-size: 13px; }
+.hint-desc { color: var(--text-2); font-size: 13px; }
+.chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.chip { display: flex; align-items: center; gap: 8px; padding: 4px 4px 4px 4px; border-radius: 10px; background: var(--bg); border: 0.5px solid var(--border); max-width: 280px; }
+.chip-error { border-color: var(--danger); }
+.chip-thumb { width: 40px; height: 40px; border-radius: 6px; background: var(--hover); display: flex; align-items: center; justify-content: center; overflow: hidden; color: var(--text-3); flex: none; }
+.chip-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.chip-text { display: flex; flex-direction: column; min-width: 0; font-size: 13px; }
+.chip-status { font-size: 11px; color: var(--text-2); }
+.chip-status.uploading { color: var(--accent-strong); }
+.chip-status.error { color: var(--danger); }
+.chip-remove { width: 28px; height: 28px; border: none; }
+.choice { position: relative; }
+.choice-btn { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 10px; border-radius: 8px; border: none; background: transparent; color: var(--text-2); font: inherit; font-size: 13px; cursor: pointer; }
+.choice-btn:hover, .choice-btn[aria-expanded='true'] { background: var(--hover); color: var(--text); }
+.choice-menu { position: absolute; right: 0; bottom: calc(100% + 8px); width: 300px; z-index: 7; max-height: 360px; overflow-y: auto; }
+.choice-title { padding: 6px 10px 4px; }
+.choice-item { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; border: none; border-radius: 8px; background: transparent; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.choice-item:hover, .choice-item[aria-checked='true'] { background: var(--hover); }
+.choice-text { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }

@@ -16,7 +16,12 @@ export class TmuxService {
   async list(): Promise<Result<TmuxSession[]>> {
     if (!this.conn.connected) return fail('NOT_CONNECTED', 'Нет подключения к ВМ');
     const r = await this.conn.exec(`tmux ls -F ${shellQuote(TMUX_LS_FORMAT)}`);
-    if (r.code === 0) return ok(parseSessions(r.stdout));
+    if (r.code === 0) {
+      const sessions = parseSessions(r.stdout);
+      // Для E2E: процесс cat изображает claude, чтобы не запускать настоящий
+      if (process.env.CVG_FAKE_CLAUDE === '1') for (const s of sessions) if (s.command === 'cat') s.claudeRunning = true;
+      return ok(sessions);
+    }
     if (r.code === 127) return fail('NO_TMUX', NO_TMUX);
     // Нет ни одной сессии — сервер tmux не запущен
     if (/no server running|error connecting|no sessions/i.test(r.stderr)) return ok([]);
