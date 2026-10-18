@@ -1,0 +1,118 @@
+/* Общие элементы */
+.mono { font-family: var(--font-mono); }
+.caption { font-size: 12px; color: var(--text-2); }
+.hint { font-size: 12px; color: var(--text-2); }
+.row { display: flex; align-items: center; flex-wrap: wrap; }
+.row.end { justify-content: flex-end; }
+.gap-8 { gap: 8px; }
+.gap-12 { gap: 12px; }
+.grow { flex: 1; }
+
+.card {
+  background: var(--panel);
+  border: 0.5px solid var(--border);
+  border-radius: 16px;
+  padding: 24px;
+  box-sizing: border-box;
+}
+
+.btn {
+  min-height: 40px;
+  padding: 0 16px;
+  border-radius: 8px;
+  border: 0.5px solid var(--border-strong);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.btn:hover { background: var(--hover); }
+.btn:focus-visible, .icon-btn:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.btn-dark { background: var(--btn-dark-bg); color: var(--btn-dark-text); border-color: transparent; }
+.btn-dark:hover { background: var(--btn-dark-bg); opacity: 0.9; }
+.btn:disabled { opacity: 0.45; cursor: default; }
+
+.spin { animation: spin 0.9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Экран подключения */
+.connect-screen {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 32px;
+  padding: 40px 24px;
+  box-sizing: border-box;
+}
+.connect-title { display: flex; align-items: center; gap: 12px; }
+.connect-title h1 { margin: 0; font-family: var(--font-serif); font-size: 34px; font-weight: 400; }
+.connect-card { width: 100%; max-width: 520px; display: flex; flex-direction: column; gap: 18px; }
+.field-caption { display: flex; flex-direction: column; gap: 4px; }
+.field-caption .mono { font-size: 15px; }
+.steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+.step { display: flex; gap: 12px; align-items: flex-start; }
+.step.skipped { color: var(--text-3); }
+.step-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.step-detail { font-size: 13px; color: var(--text-2); overflow-wrap: anywhere; }
+.step-dash { width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center; flex: none; color: var(--text-3); }
+
+/* Диалоги */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--overlay);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 20;
+}
+.dialog {
+  width: 100%;
+  max-width: 480px;
+  background: var(--bg);
+  border-radius: 16px;
+  box-shadow: 0 12px 40px rgba(20, 20, 19, 0.2);
+  padding: 24px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.dialog h2 { margin: 0; font-family: var(--font-serif); font-size: 24px; font-weight: 500; }
+.dialog p { margin: 0; line-height: 1.5; }
+.fingerprint { padding: 10px 12px; border-radius: 8px; background: var(--panel); border: 0.5px solid var(--border); overflow-wrap: anywhere; }
+.form-error { color: var(--danger); font-size: 13px; }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field.port { width: 96px; }
+.field label { font-size: 13px; color: var(--text-2); }
+.field input, .field select {
+  min-height: 40px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 0.5px solid var(--border-strong);
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+}
+.field input.mono { font-family: var(--font-mono); font-size: 13px; }
+
+/* Главное окно */
+.main-layout { display: flex; height: 100%; }
+.sidebar {
+  width: 260px;
+  flex: none;
+  background: var(--sidebar);
+  border-right: 0.5px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px 12px;
+  box-sizing: border-box;
+}
+.brand { display: flex; align-items: center; gap: 10px; padding: 4px 8px; font-family: var(--font-serif); font-size: 20px; font-weight: 500; }

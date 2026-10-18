@@ -1,5 +1,6 @@
 import { app, BrowserWindow, session, shell } from 'electron';
 import { join } from 'node:path';
+import { AppController } from './controller';
 import { IpcHub, repoDirForDev } from './ipc';
 
 const CSP = "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:";
@@ -44,7 +45,10 @@ app.whenReady().then(() => {
   });
   const hub = new IpcHub({ userDataDir: app.getPath('userData'), repoDir: repoDirForDev() });
   hub.registerBase();
+  const controller = new AppController(hub);
+  controller.register();
   hub.attach(createWindow());
+  app.on('before-quit', () => controller.disconnect());
 });
 
 app.on('window-all-closed', () => app.quit());
