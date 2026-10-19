@@ -89,6 +89,7 @@ export class AppController {
       knownHostsPath: this.knownHostsPath,
       askHostKey: (p) => this.askHostKey(p),
       onPreflight: (e) => this.hub.emit('connection:preflight', e),
+      password: this.hub.password(),
     });
     // После обрыва «Подключено» показываем, только когда терминал снова в сессии — иначе ввод потеряется
     let reattaching = false;

@@ -86,10 +86,11 @@ export function answerHostKey(trust: boolean): void {
   setState({ hostKey: null });
 }
 
-export async function saveConfig(c: VmConfig): Promise<string | null> {
-  const r = await api.config.save(c);
+/** password: undefined — не менять сохранённый, null — удалить, строка — новый. */
+export async function saveConfig(c: VmConfig, password?: string | null): Promise<string | null> {
+  const r = await api.config.save(c, password);
   if (!r.ok) return r.error.message;
-  setState({ config: c });
+  setState({ config: await api.config.get() });
   return null;
 }
 

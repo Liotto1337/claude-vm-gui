@@ -1,4 +1,6 @@
 import { expect, test } from '@playwright/test';
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { launchApp, withConfig, tempKnownHostsPath, TEST_KEY, hasTestKey } from './helpers';
 
 test('без настроек открывается окно «Настройки подключения»', async () => {
@@ -70,6 +72,36 @@ test('отказ доверять ключу — ошибка на шаге SSH'
     await page.getByRole('dialog', { name: 'Новый сервер' }).getByRole('button', { name: 'Отмена' }).click();
     await expect(page.getByText('Ключ сервера не принят')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Повторить' })).toBeVisible();
+  } finally {
+    await app.close();
+  }
+});
+
+test('пароль сохраняется и показывается как сохранённый, в файле его нет', async () => {
+  // CVG_TEST_HOOKS включает на Linux шифрование без хранилища ключей
+  const { app, page, userData } = await launchApp({ CVG_TEST_HOOKS: '1' });
+  try {
+    await page.getByLabel('Адрес ВМ').fill('127.0.0.1');
+    await page.getByLabel('Порт').fill('1');
+    await page.getByLabel('Путь к SSH-ключу').fill('');
+    await page.getByLabel('Пароль (необязательно)').fill('секрет-e2e');
+    await page.getByRole('button', { name: 'Сохранить и подключиться' }).click();
+    const available = await app.evaluate(({ safeStorage }) => safeStorage.isEncryptionAvailable());
+    const file = join(userData, 'config.json');
+    if (!available) {
+      // Без хранилища ключей пароль не сохраняется — и честно об этом сообщается
+      await expect(page.getByText('Шифрование недоступно, пароль не сохранён')).toBeVisible();
+      expect(existsSync(file) ? readFileSync(file, 'utf8') : '').not.toContain('секрет-e2e');
+      return;
+    }
+    await expect(page.getByRole('heading', { name: 'Подключение к ВМ' })).toBeVisible();
+    expect(readFileSync(file, 'utf8')).not.toContain('секрет-e2e');
+    expect(JSON.parse(readFileSync(file, 'utf8')).passwordEnc).toBeTruthy();
+    await page.getByRole('button', { name: 'Настройки подключения' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Настройки подключения' });
+    await expect(dialog.getByText('Пароль сохранён')).toBeVisible();
+    await dialog.getByRole('button', { name: 'Удалить пароль' }).click();
+    await expect(dialog.getByLabel('Пароль (необязательно)')).toHaveValue('');
   } finally {
     await app.close();
   }

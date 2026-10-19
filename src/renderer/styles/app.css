@@ -90,7 +90,7 @@
 .form-error { color: var(--danger); font-size: 13px; }
 .field { display: flex; flex-direction: column; gap: 6px; }
 .field.port { width: 96px; }
-.field label { font-size: 13px; color: var(--text-2); }
+.field label, .field .label-like { font-size: 13px; color: var(--text-2); }
 .field input, .field select {
   min-height: 40px;
   padding: 0 12px;

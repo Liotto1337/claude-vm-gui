@@ -29,6 +29,8 @@ export interface VmConfig {
   keyPath: string;
   theme: 'system' | 'light' | 'dark';
   lastSession?: string;
+  /** Только чтение: пароль сохранён (сам пароль в интерфейс не передаётся) */
+  hasPassword?: boolean;
 }
 
 export type PreflightStep = 'ping' | 'tcp' | 'ssh' | 'tmux';
@@ -103,7 +105,7 @@ export type ExitReason = 'detached' | 'killed' | 'connection-lost';
 export type Unsubscribe = () => void;
 
 export interface Api {
-  config: { get(): Promise<VmConfig | null>; save(c: VmConfig): Promise<Result<void>> };
+  config: { get(): Promise<VmConfig | null>; save(c: VmConfig, password?: string | null): Promise<Result<void>> };
   connection: {
     connect(): Promise<Result<void>>;
     disconnect(): Promise<void>;

@@ -1,7 +1,7 @@
 import { EventEmitter } from 'node:events';
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { Client, utils, type ClientChannel, type ConnectConfig, type SFTPWrapper } from 'ssh2';
+import { Client, utils, type AnyAuthMethod, type AuthHandlerMiddleware, type ClientChannel, type ConnectConfig, type SFTPWrapper } from 'ssh2';
 import { backoffDelay } from '@shared/backoff';
 import { fail, ok, type ConnectionState, type HostKeyPrompt, type PreflightEvent, type Result, type VmConfig } from '@shared/ipc';
 import { checkKnownHosts, fingerprintSha256, hostKeyAlgorithms, keyTypeFromBlob, knownHostsLine, knownTypesFor } from '@shared/known-hosts';
@@ -13,6 +13,8 @@ export interface SshOptions {
   knownHostsPath: string;
   askHostKey: (p: HostKeyPrompt) => Promise<boolean>;
   onPreflight?: (e: PreflightEvent) => void;
+  /** Пароль (расшифрованный, только в главном процессе). Пробуется после ключа и ssh-agent. */
+  password?: string;
 }
 
 export interface ExecResult { code: number; stdout: string; stderr: string }
@@ -83,11 +85,59 @@ export class SshConnection extends EventEmitter {
     return { agent };
   }
 
+  /**
+   * Порядок входа: ключ → ssh-agent → password → keyboard-interactive. Сначала `none` — узнать,
+   * какие методы сервер предлагает: методы, которых нет в списке, не пробуются.
+   */
+  private authHandler(auth: Pick<ConnectConfig, 'privateKey' | 'agent'> | null): { handler: AuthHandlerMiddleware; offered: () => string[] | null } {
+    const username = this.cfg.username;
+    const password = this.opts.password;
+    const queue: { method: string; auth: AnyAuthMethod; detail: string }[] = [];
+    if (auth?.privateKey) queue.push({ method: 'publickey', auth: { type: 'publickey', username, key: auth.privateKey as Buffer }, detail: this.authDetail });
+    if (auth?.agent) queue.push({ method: 'publickey', auth: { type: 'agent', username, agent: auth.agent as string }, detail: this.authDetail });
+    if (password) {
+      queue.push({ method: 'password', auth: { type: 'password', username, password }, detail: 'пароль' });
+      queue.push({
+        method: 'keyboard-interactive',
+        auth: {
+          type: 'keyboard-interactive',
+          username,
+          prompt: (_n, _i, _l, prompts, finish) => finish(prompts.map((p) => (p.echo ? '' : password))),
+        },
+        detail: 'пароль',
+      });
+    }
+    let offered: string[] | null = null;
+    let triedNone = false;
+    const handler: AuthHandlerMiddleware = (methodsLeft, _partial, next) => {
+      if (methodsLeft) offered = methodsLeft;
+      if (!triedNone) {
+        triedNone = true;
+        return next({ type: 'none', username });
+      }
+      for (let step = queue.shift(); step; step = queue.shift()) {
+        if (offered && !offered.includes(step.method)) continue;
+        this.authDetail = step.detail;
+        return next(step.auth);
+      }
+      return (next as unknown as (a: false) => void)(false);
+    };
+    return { handler, offered: () => offered };
+  }
+
+  private authFailedText(offered: string[] | null): string {
+    if (!this.opts.password) return `Сервер не принял ключ ${this.cfg.keyPath}. Проверьте путь к ключу или ssh-agent`;
+    if (offered && !offered.includes('password') && !offered.includes('keyboard-interactive'))
+      return 'На сервере выключен вход по паролю. Используйте SSH-ключ';
+    return 'Сервер не принял ни ключ, ни пароль';
+  }
+
   private connectOnce(interactive: boolean): Promise<Result<void>> {
     const auth = this.authConfig();
-    if (!auth) {
+    if (!auth && !this.opts.password) {
       return Promise.resolve(fail('AUTH_FAILED', `Не удалось прочитать ключ ${this.cfg.keyPath}, и ssh-agent недоступен`));
     }
+    const { handler, offered } = this.authHandler(auth);
     const knownText = existsSync(this.opts.knownHostsPath) ? readFileSync(this.opts.knownHostsPath, 'utf8') : '';
     const knownTypes = knownTypesFor(knownText, this.cfg.host, this.cfg.port);
     return new Promise((resolve) => {
@@ -130,7 +180,7 @@ export class SshConnection extends EventEmitter {
             fail('HOSTKEY_MISMATCH', `Сервер не предложил ключ известного типа (${knownTypes.join(', ')}). Возможна подмена сервера`),
           );
         else if (/authentication methods failed/i.test(err.message))
-          settle(fail('AUTH_FAILED', `Сервер не принял ключ ${this.cfg.keyPath}. Проверьте путь к ключу или ssh-agent`));
+          settle(fail('AUTH_FAILED', this.authFailedText(offered())));
         else settle(fail('TCP_UNREACHABLE', err.message));
       });
       client.on('close', () => settle(fail('TCP_UNREACHABLE', 'Соединение закрыто')));
@@ -139,7 +189,7 @@ export class SshConnection extends EventEmitter {
         host: this.cfg.host,
         port: this.cfg.port,
         username: this.cfg.username,
-        ...auth,
+        authHandler: handler,
         readyTimeout: 0,
         // Сон ПК или пропавшая сеть замечаются примерно за 15 с
         keepaliveInterval: 5_000,

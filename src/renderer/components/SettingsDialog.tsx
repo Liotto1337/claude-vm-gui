@@ -9,12 +9,16 @@ export function SettingsDialog({ onClose }: { onClose?: () => void }) {
   const [form, setForm] = useState<VmConfig>(config ?? DEFAULTS);
   const [portText, setPortText] = useState(String((config ?? DEFAULTS).port));
   const [error, setError] = useState<string | null>(null);
+  // Пароль: 'saved' — сохранён и не меняется, 'edit' — вводится новый, 'deleted' — удалить при сохранении
+  const [pwdMode, setPwdMode] = useState<'saved' | 'edit' | 'deleted'>(config?.hasPassword ? 'saved' : 'edit');
+  const [password, setPassword] = useState('');
   const set = (patch: Partial<VmConfig>) => setForm((f) => ({ ...f, ...patch }));
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     const next = { ...form, port: Number(portText) };
-    const err = await saveConfig(next);
+    const pwd = pwdMode === 'deleted' && password === '' ? null : pwdMode === 'saved' || password === '' ? undefined : password;
+    const err = await saveConfig(next, pwd);
     setError(err);
     if (!err) void connect();
   };
@@ -46,8 +50,31 @@ export function SettingsDialog({ onClose }: { onClose?: () => void }) {
         <div className="field">
           <label htmlFor="set-key">Путь к SSH-ключу</label>
           <input id="set-key" className="mono" value={form.keyPath} onChange={(e) => set({ keyPath: e.target.value })} />
-          <span className="hint">Если ключ защищён паролем, приложение возьмёт его из ssh-agent Windows</span>
+          <span className="hint">Не нужен, если задан пароль. Если ключ защищён паролем, приложение возьмёт его из ssh-agent Windows</span>
         </div>
+        {pwdMode === 'saved' ? (
+          <div className="field">
+            <span className="label-like">Пароль</span>
+            <div className="row gap-8">
+              <span className="grow">Пароль сохранён</span>
+              <button type="button" className="btn" onClick={() => setPwdMode('edit')}>Изменить пароль</button>
+              <button type="button" className="btn" onClick={() => setPwdMode('deleted')}>Удалить пароль</button>
+            </div>
+          </div>
+        ) : (
+          <div className="field">
+            <label htmlFor="set-password">Пароль (необязательно)</label>
+            <input
+              id="set-password"
+              type="password"
+              autoComplete="off"
+              value={password}
+              placeholder={pwdMode === 'deleted' ? 'Сохранённый пароль будет удалён' : ''}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+            <span className="hint">Хранится зашифрованным средствами Windows. Пусто — вход по ключу</span>
+          </div>
+        )}
         <div className="field">
           <label htmlFor="set-theme">Тема</label>
           <select
