@@ -1,6 +1,7 @@
 import { app, clipboard, ipcMain, nativeTheme, safeStorage, type BrowserWindow } from 'electron';
-import type { Result, VmConfig } from '@shared/ipc';
+import type { Result, SidebarLayout, VmConfig } from '@shared/ipc';
 import { loadConfig, loadPassword, saveConfig, type SecretBox } from './config';
+import { LayoutStore } from './layout-store';
 
 /** Пароль шифруется средствами ОС (DPAPI на Windows). */
 const safeBox: SecretBox = {
@@ -14,8 +15,11 @@ type Handler = (...args: never[]) => unknown;
 /** Связка window.api ↔ сервисы main. Каналы: «группа:метод», события: «группа:событие». */
 export class IpcHub {
   private win: BrowserWindow | null = null;
+  readonly layouts: LayoutStore;
 
-  constructor(private readonly paths: { userDataDir: string; repoDir?: string }) {}
+  constructor(private readonly paths: { userDataDir: string; repoDir?: string }) {
+    this.layouts = new LayoutStore(paths.userDataDir);
+  }
 
   attach(win: BrowserWindow): void {
     this.win = win;
@@ -49,6 +53,9 @@ export class IpcHub {
     this.handle('config:save', (c: VmConfig, password?: string | null): Result<void> =>
       saveConfig(this.paths.userDataDir, c, typeof password === 'string' || password === null ? password : undefined, safeBox),
     );
+    // Раскладка сайдбара — отдельно для каждой ВМ
+    this.handle('layout:get', () => this.layouts.get(this.config()?.host ?? ''));
+    this.handle('layout:save', (l: SidebarLayout) => this.layouts.save(this.config()?.host ?? '', l));
     this.handle('platform:theme', () => (nativeTheme.shouldUseDarkColors ? 'dark' : 'light'));
     nativeTheme.on('updated', () => this.emit('platform:themeChange', nativeTheme.shouldUseDarkColors ? 'dark' : 'light'));
     // Буфер обмена Windows через main: navigator.clipboard в renderer не пишет, пока окно не в фокусе

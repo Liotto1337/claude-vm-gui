@@ -89,6 +89,12 @@ export interface UploadProgress {
 
 export type ImageExt = 'png' | 'jpg' | 'gif' | 'webp';
 
+/** Порядок, закрепление и группы сессий в сайдбаре (хранится локально, отдельно для каждой ВМ). */
+export interface SidebarLayout { v: 1; items: LayoutItem[] }
+export type LayoutItem =
+  | { kind: 'session'; name: string; pinned?: boolean }
+  | { kind: 'group'; id: string; name: string; pinned?: boolean; collapsed?: boolean; sessions: { name: string; pinned?: boolean }[] };
+
 /** Клавиши, которые интерфейс может отправить в claude (карточка меню, «Остановить»). */
 export type MenuKey = 'up' | 'down' | 'left' | 'right' | 'enter' | 'esc' | 'tab' | 'shift-tab'
   | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9';
@@ -141,6 +147,7 @@ export interface Api {
     onProgress(cb: (p: UploadProgress) => void): Unsubscribe;
   };
   clipboard: { read(): Promise<string>; write(text: string): void };
+  layout: { get(): Promise<SidebarLayout>; save(l: SidebarLayout): Promise<Result<void>> };
   platform: {
     theme(): Promise<'light' | 'dark'>;
     onThemeChange(cb: (t: 'light' | 'dark') => void): Unsubscribe;

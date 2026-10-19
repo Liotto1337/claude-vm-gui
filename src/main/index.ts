@@ -50,7 +50,10 @@ app.whenReady().then(() => {
   const controller = new AppController(hub);
   controller.register();
   hub.attach(createWindow());
-  app.on('before-quit', () => controller.disconnect());
+  app.on('before-quit', () => {
+    hub.layouts.flush();
+    controller.disconnect();
+  });
   if (process.env.CVG_TEST_HOOKS === '1') {
     (globalThis as unknown as { __cvg: object }).__cvg = { dropConnection: () => controller.simulateDrop() };
     // E2E на Linux без хранилища ключей: шифрование «для вида», чтобы проверить сохранение пароля
