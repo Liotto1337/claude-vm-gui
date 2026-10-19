@@ -37,6 +37,7 @@ describe('parseMenu', () => {
         { n: null, label: 'Yes, I trust this folder', selected: false },
       ],
     }));
+  it('доверие папке: контекст — текст, не код', () => expect(parseMenu(plain('trust'))!.code.every((c) => !c)).toBe(true));
   it('после ↓ выбран второй вариант', () =>
     expect(parseMenu(plain('trust-yes'))!.options.map((o) => o.selected)).toEqual([false, true]));
   it('/model — номера, описания, notes', () => {
@@ -56,6 +57,8 @@ describe('parseMenu', () => {
     expect(m.title).toBe('Bash command');
     expect(m.context.join('\n')).toContain('touch /tmp/project');
     expect(m.context.join('\n')).not.toMatch(/╌/);
+    // Строки между пунктирами — код (команда), остальное — текст
+    expect(m.context.filter((_, i) => m.code[i])).toEqual(['touch /tmp/project']);
     expect(m.options.map((o) => o.n)).toEqual([1, 2, 3, 4]);
     expect(m.hint).toBe('Esc to cancel · Tab to amend');
   });

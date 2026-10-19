@@ -30,10 +30,14 @@ async function readRange(conn: SshConnection, q: string, from: number, len: numb
   return { lines: body.split('\n').filter((l) => l !== ''), start: from + (from > 0 ? drop : 0) };
 }
 
-/** Хвост файла (не больше bytes) целыми строками, размер файла и смещение первой целой строки. */
+/**
+ * Хвост файла (не больше bytes) целыми строками, размер файла и смещение первой целой строки.
+ * Файла нет — пустой хвост: у новой сессии Claude Code создаёт журнал только с первым сообщением.
+ */
 export async function readTail(conn: SshConnection, path: string, bytes: number): Promise<{ lines: string[]; start: number; size: number }> {
   const q = shellQuote(path);
-  const r = await conn.exec(`stat -c %s -- ${q}`, { timeoutMs: 5000 });
+  const r = await conn.exec(`if [ -e ${q} ]; then stat -c %s -- ${q}; else echo missing; fi`, { timeoutMs: 5000 });
+  if (r.stdout.trim() === 'missing') return { lines: [], start: 0, size: 0 };
   const size = Number(r.stdout.trim());
   if (r.code !== 0 || !Number.isFinite(size)) throw new Error(NOT_FOUND);
   const from = Math.max(0, size - bytes);

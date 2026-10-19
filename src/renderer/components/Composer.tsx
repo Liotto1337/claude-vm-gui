@@ -206,7 +206,13 @@ export function Composer({ session, menu = null, working = false, chatMode = fal
           </button>
         </div>
       ) : null}
-      {menu ? <MenuCard menu={menu} /> : null}
+      {/* Карточка всплывает над полем, не меняя раскладку: иначе терминал под лентой стал бы ниже
+          и Claude Code перерисовал бы меню, обрезав его начало */}
+      {menu ? (
+        <div className="menu-layer">
+          <MenuCard menu={menu} />
+        </div>
+      ) : null}
       <div className="composer-anchor">
         <HintPopup items={items} active={active} onPick={pick} />
         <div className="composer">

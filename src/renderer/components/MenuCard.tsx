@@ -6,8 +6,6 @@ import { api } from '../api';
 const KEY_MAP: Record<string, MenuKey> = {
   ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right', Enter: 'enter', Escape: 'esc',
 };
-/** Строка контекста похожа на команду, путь или код — моноширинно. */
-const looksLikeCode = (s: string) => /^[$>~/.]|\/|^\s*\d+\s|[{}();=]/.test(s);
 
 /** Меню Claude Code (разрешение, вопрос, выбор) карточкой; клавиши уходят в claude как есть. */
 export function MenuCard({ menu }: { menu: ParsedMenu }) {
@@ -39,7 +37,7 @@ export function MenuCard({ menu }: { menu: ParsedMenu }) {
       <div className="menu-head">
         <span className="menu-title">{title}</span>
         {menu.context.map((c, i) => (
-          <span key={i} className={looksLikeCode(c) ? 'menu-context mono' : 'menu-context'}>{c}</span>
+          <span key={i} className={menu.code[i] ? 'menu-context mono' : 'menu-context'}>{c}</span>
         ))}
       </div>
       <div role="listbox" aria-label="Варианты" className="menu-options">

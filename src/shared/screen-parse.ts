@@ -144,14 +144,22 @@ export function parseMenu(plain: string): ParsedMenu | null {
   }
   if (options.length === 0) return null;
 
-  const head: string[] = [];
-  for (let j = start - 1; j >= 0; j--) {
-    if (isBoundary(lines[j])) break;
+  // Шапка: от ближайшей сплошной линии до вариантов; строки между пунктирами «╌» — код
+  let top = start - 1;
+  while (top >= 0 && !isBoundary(lines[top])) top--;
+  const head: { text: string; code: boolean }[] = [];
+  let inCode = false;
+  for (let j = top + 1; j < start; j++) {
     const l = lines[j].trim();
-    if (l !== '' && !isRule(l, '╌')) head.unshift(l);
+    if (isRule(l, '╌')) {
+      inCode = !inCode;
+      continue;
+    }
+    if (l !== '') head.push({ text: l, code: inCode });
   }
-  const [title = '', ...context] = head;
-  return { title, context: context.slice(0, 6), options, notes, hint: lines[f].trim() };
+  const [title = { text: '' }, ...rest] = head;
+  const ctx = rest.slice(0, 6);
+  return { title: title.text, context: ctx.map((c) => c.text), code: ctx.map((c) => c.code), options, notes, hint: lines[f].trim() };
 }
 
 /** Что сейчас на экране claude. `no-claude` решает вызывающий (по процессу в панели). */

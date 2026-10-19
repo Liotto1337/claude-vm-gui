@@ -100,6 +100,23 @@ test('меню: карточка, стрелка вниз и Enter выбира�
   }
 });
 
+test('карточка меню не меняет размер терминала (claude не перерисовывает меню)', async () => {
+  const { app, page } = await open();
+  try {
+    await expect(feed(page)).toBeVisible({ timeout: 15_000 });
+    await page.waitForTimeout(1000);
+    const size = () => tmux('display', '-p', '-t', '=cvg-test-claude:', '#{pane_width}x#{pane_height}').trim();
+    const before = size();
+    await composer(page).fill('menu');
+    await composer(page).press('Enter');
+    await expect(page.getByRole('group', { name: 'Выбор' })).toBeVisible({ timeout: 10_000 });
+    await page.waitForTimeout(800);
+    expect(size()).toBe(before);
+  } finally {
+    await app.close();
+  }
+});
+
 test('меню: клик по варианту', async () => {
   const { app, page } = await open();
   try {

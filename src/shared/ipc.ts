@@ -128,7 +128,15 @@ export type MenuKey = 'up' | 'down' | 'left' | 'right' | 'enter' | 'esc' | 'tab'
 
 export interface MenuOption { n: number | null; label: string; description: string; selected: boolean }
 /** Меню Claude Code, разобранное с экрана: запрос разрешения, AskUserQuestion, /model и т. п. */
-export interface ParsedMenu { title: string; context: string[]; options: MenuOption[]; notes: string[]; hint: string | null }
+export interface ParsedMenu {
+  title: string;
+  context: string[];
+  /** code[i] — строка context[i] стояла между пунктирами «╌» (команда, путь, содержимое файла) */
+  code: boolean[];
+  options: MenuOption[];
+  notes: string[];
+  hint: string | null;
+}
 export type ScreenState =
   | { kind: 'no-claude' }
   | { kind: 'prompt'; status: string | null; input: string }

@@ -86,11 +86,16 @@ describe.skipIf(!hasTestKey)('журнал Claude Code по SSH', () => {
     svc.stop();
   });
 
-  it('нет файла → unavailable', async () => {
+  it('файла ещё нет (новая сессия) — пустая лента, затем записи по мере появления', async () => {
+    const path = join(dir, 'later.jsonl');
     const svc = new TranscriptService(conn);
-    const { unavailable } = collect(svc);
-    await svc.follow(join(dir, 'nope.jsonl'));
-    expect(unavailable).toEqual(['Журнал сессии не найден']);
+    const { events, unavailable } = collect(svc);
+    await svc.follow(path);
+    expect(unavailable).toEqual([]);
+    expect(events[0]).toMatchObject({ reset: true, items: [], hasEarlier: false });
+    await sleep(500);
+    writeFileSync(path, user('first', 'первое сообщение'));
+    await expect.poll(() => events.flatMap((e) => e.items).some((i) => i.kind === 'user' && i.text === 'первое сообщение'), { timeout: 8000 }).toBe(true);
     svc.stop();
   });
 
