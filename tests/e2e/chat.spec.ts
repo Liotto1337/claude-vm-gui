@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -31,8 +32,8 @@ test.afterEach(() => {
   } catch {}
 });
 
-async function open(session = 'cvg-test-claude'): Promise<Launched> {
-  const userData = withConfig({ host: '127.0.0.1', port: 22, username: 'root', keyPath: TEST_KEY, theme: 'light' });
+async function open(session = 'cvg-test-claude', theme = 'light'): Promise<Launched> {
+  const userData = withConfig({ host: '127.0.0.1', port: 22, username: 'root', keyPath: TEST_KEY, theme });
   const l = await launchApp({
     CVG_USER_DATA: userData, CVG_KNOWN_HOSTS: trustedKnownHosts(), CVG_TMUX_SOCKET: SOCK, CVG_CLAUDE_DIR: claudeDir, CVG_TEST_HOOKS: '1',
   });
@@ -149,6 +150,28 @@ test('новый ответ «печатается» посимвольно, а 
     await expect(answer).toContainText('Конец ответа.', { timeout: 5000 });
     const full = ((await answer.textContent()) ?? '').length;
     expect(lengths.some((n) => n > 0 && n < full)).toBe(true);
+  } finally {
+    await app.close();
+  }
+});
+
+test('в тёмной теме отправляемый пузырь заметно отличается от обычного', async () => {
+  const { app, page } = await open('cvg-test-claude', 'dark');
+  try {
+    await expect(feed(page).locator('.bubble').first()).toBeVisible({ timeout: 15_000 });
+    // rgb(58, 58, 55) или color(srgb 0.19 0.19 0.18) после color-mix — в 0–255
+    const rgb = (s: string) => {
+      const v = (s.match(/\d+(\.\d+)?/g) ?? []).slice(0, 3).map(Number);
+      return s.startsWith('color(') ? v.map((x) => Math.round(x * 255)) : v;
+    };
+    const normal = rgb(await feed(page).locator('.bubble').first().evaluate((e) => getComputedStyle(e).backgroundColor));
+    await composer(page).fill('тёмная тема');
+    await composer(page).press('Enter');
+    const sending = feed(page).locator('.bubble.is-sending');
+    await expect(sending).toBeVisible({ timeout: 400 });
+    const dim = rgb(await sending.evaluate((e) => getComputedStyle(e).backgroundColor));
+    const diff = normal.reduce((a, v, i) => a + Math.abs(v - dim[i]), 0);
+    expect(diff).toBeGreaterThan(30);
   } finally {
     await app.close();
   }

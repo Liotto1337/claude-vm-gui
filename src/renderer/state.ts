@@ -172,15 +172,16 @@ export async function init(): Promise<void> {
         const known = new Set(c.items.map((i) => i.id));
         for (const i of e.items) if (i.kind === 'assistant' && !known.has(i.id)) typing[i.id] = performance.now();
       }
-      return { items, typing, pending: claimPending(c.pending, items, Date.now()), hasEarlier: e.hasEarlier, unavailable: null };
+      return { items, typing, pending: claimPending(c.pending, items, Date.now(), c.busy), hasEarlier: e.hasEarlier, unavailable: null };
     }),
   );
   // Доставленные пузыри без записи журнала уходят сами
   setInterval(() => {
     for (const [session, c] of Object.entries(state.chat))
       if (c.pending.some((p) => p.state === 'sent')) {
-        const next = claimPending(c.pending, c.items, Date.now());
-        if (next.length !== c.pending.length) patchChat(session, () => ({ pending: next }));
+        // Пока Claude работает, отсчёт 20 с стоит: сообщение может ждать в очереди
+        const next = claimPending(c.pending, c.items, Date.now(), c.busy);
+        if (next.length !== c.pending.length || c.busy) patchChat(session, () => ({ pending: next }));
       }
   }, 5000);
   api.chat.onScreen((e) => patchChat(e.session, () => ({ screen: e.state, busy: e.busy })));
@@ -284,7 +285,7 @@ export function addPending(session: string, text: string, images: number): strin
 /** Claude Code принял сообщение — пузырь обычного цвета, пока не появится запись журнала. */
 export function markPendingSent(session: string, id: string): void {
   patchChat(session, (c) => ({
-    pending: claimPending(c.pending.map((p) => (p.id === id ? { ...p, state: 'sent' as const, at: Date.now() } : p)), c.items, Date.now()),
+    pending: claimPending(c.pending.map((p) => (p.id === id ? { ...p, state: 'sent' as const, at: Date.now() } : p)), c.items, Date.now(), c.busy),
   }));
 }
 

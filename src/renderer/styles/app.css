@@ -335,6 +335,8 @@
 
 /* ── Последние штрихи (0.2.1) ── */
 .bubble.is-sending { background: color-mix(in srgb, var(--bubble) 86%, #000); }
+/* В тёмной теме смешивание с чёрным почти незаметно: ближе к фону и приглушённый текст */
+[data-theme='dark'] .bubble.is-sending { background: color-mix(in srgb, var(--bubble) 35%, var(--bg)); color: var(--text-2); }
 .spinner { display: inline-block; width: 1em; text-align: center; color: var(--accent); }
 .session-header .btn-kill { color: var(--danger); }
 .procs { border-collapse: collapse; }

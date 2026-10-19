@@ -39,4 +39,19 @@ describe('временный пузырь отправленного сообщ�
   });
   it('отправляемый пузырь по таймауту не уходит', () =>
     expect(claimPending([{ ...p('p1', 'x', [], 'sending'), at: 0 }], [], 60_000)).toHaveLength(1));
+  it('сообщение с «!» совпадает с записью «! cmd»', () =>
+    expect(claimPending([p('p1', '!pwd', [])], [u('u1', '! pwd')], 1000)).toEqual([]));
+  it('одна запись не забирает второй одинаковый пузырь на следующем вызове', () => {
+    const first = claimPending([p('p1', 'ок', []), p('p2', 'ок', [])], [u('u1', 'ок')], 1000);
+    expect(first.map((x) => x.id)).toEqual(['p2']);
+    expect(claimPending(first, [u('u1', 'ок')], 2000).map((x) => x.id)).toEqual(['p2']);
+  });
+  it('пока Claude работает, доставленный пузырь не уходит (сообщение в очереди)', () => {
+    const pend = [{ ...p('p1', 'x', []), at: 0 }];
+    const kept = claimPending(pend, [], 60_000, true);
+    expect(kept).toHaveLength(1);
+    // отсчёт 20 с начинается заново после работы
+    expect(claimPending(kept, [], 70_000)).toHaveLength(1);
+    expect(claimPending(kept, [], 81_000)).toHaveLength(0);
+  });
 });

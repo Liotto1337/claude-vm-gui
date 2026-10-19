@@ -27,22 +27,31 @@ export interface Pending {
 }
 
 const SENT_TTL_MS = 20_000;
-const norm = (s: string) => s.replace(/\s+/g, ' ').trim();
+// «!pwd» в поле и «! pwd» в журнале (bash-режим) — одно и то же сообщение
+const norm = (s: string) => s.replace(/^\s*!\s*/, '! ').replace(/\s+/g, ' ').trim();
 
 /**
- * Убирает временные пузыри, у которых появилась запись в журнале (новый user с тем же текстом и числом картинок;
- * каждая запись забирает не больше одного пузыря). Доставленный пузырь без записи уходит через 20 с.
+ * Убирает временные пузыри, у которых появилась запись в журнале (новый user с тем же текстом и числом картинок).
+ * Запись, забравшая пузырь, становится «виденной» для остальных — на следующих вызовах она второй пузырь не заберёт.
+ * Доставленный пузырь без записи уходит через 20 с; пока Claude работает (busy), отсчёт стоит:
+ * сообщение может ждать в очереди Claude Code.
  */
-export function claimPending(pending: Pending[], items: ChatItem[], now: number): Pending[] {
-  const claimed = new Set<string>();
-  return pending.filter((p) => {
+export function claimPending(pending: Pending[], items: ChatItem[], now: number, busy = false): Pending[] {
+  const claimed: string[] = [];
+  const left = pending.filter((p) => {
     const match = items.find(
-      (i) => i.kind === 'user' && !p.seen.has(i.id) && !claimed.has(i.id) && i.images === p.images && norm(i.text) === norm(p.text),
+      (i) => i.kind === 'user' && !p.seen.has(i.id) && !claimed.includes(i.id) && i.images === p.images && norm(i.text) === norm(p.text),
     );
     if (match) {
-      claimed.add(match.id);
+      claimed.push(match.id);
       return false;
     }
-    return !(p.state === 'sent' && now - p.at > SENT_TTL_MS);
+    return busy || !(p.state === 'sent' && now - p.at > SENT_TTL_MS);
   });
+  if (claimed.length === 0 && !busy) return left;
+  return left.map((p) => ({
+    ...p,
+    seen: claimed.length ? new Set([...p.seen, ...claimed]) : p.seen,
+    at: busy && p.state === 'sent' ? now : p.at,
+  }));
 }
