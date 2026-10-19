@@ -1,0 +1,3 @@
+# Фикстуры — снимки вывода Linux: на Windows-checkout переводы строк не меняем (CRLF ломает разбор)
+tests/fixtures/** text eol=lf
+*.ans text eol=lf
