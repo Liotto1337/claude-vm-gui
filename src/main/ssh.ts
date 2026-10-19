@@ -309,6 +309,15 @@ export class SshConnection extends EventEmitter {
     });
   }
 
+  /** Долгая команда без PTY: вывод читается по мере появления (слежение за файлом). */
+  stream(cmd: string): Promise<ClientChannel> {
+    const client = this.client;
+    if (!client) return Promise.reject(new Error('NOT_CONNECTED'));
+    return new Promise((resolve, reject) => {
+      client.exec(cmd, (err, stream) => (err ? reject(err) : resolve(stream)));
+    });
+  }
+
   openPty(cmd: string, cols: number, rows: number): Promise<ClientChannel> {
     const client = this.client;
     if (!client) return Promise.reject(new Error('NOT_CONNECTED'));

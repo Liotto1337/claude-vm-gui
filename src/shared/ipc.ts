@@ -89,6 +89,19 @@ export interface UploadProgress {
 
 export type ImageExt = 'png' | 'jpg' | 'gif' | 'webp';
 
+/** Элемент ленты переписки (из журнала Claude Code). */
+export type ChatItem =
+  | { kind: 'user'; id: string; text: string; images: number }
+  | { kind: 'assistant'; id: string; text: string }
+  | { kind: 'thinking'; id: string }
+  | { kind: 'note'; id: string; text: string }
+  | {
+      kind: 'tool'; id: string; name: string; summary: string; input: string;
+      status: 'running' | 'ok' | 'error'; result: string | null; children: ChatItem[];
+    };
+export interface ChatEvent { session: string; reset: boolean; prepend: boolean; items: ChatItem[]; hasEarlier: boolean }
+export interface ScreenEvent { session: string; state: ScreenState; busy: boolean }
+
 /** Порядок, закрепление и группы сессий в сайдбаре (хранится локально, отдельно для каждой ВМ). */
 export interface SidebarLayout { v: 1; items: LayoutItem[] }
 export type LayoutItem =
