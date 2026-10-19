@@ -3,7 +3,7 @@
 // Сессии — на отдельном сервере tmux (CVG_TMUX_SOCKET), адрес ВМ подменён (CVG_DEMO_HOST),
 // поэтому настоящие сессии и адрес в картинки не попадают.
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { _electron } from '@playwright/test';
@@ -14,7 +14,30 @@ const SOCKET = 'cvg-demo';
 const KEY = join(homedir(), '.ssh/cvg_test_ed25519');
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
 
+const FAKE = join(ROOT, 'tests/fixtures/fake-claude.mjs');
+const CLAUDE_DIR = mkdtempSync(join(tmpdir(), 'cvg-shots-claude-'));
 const tmux = (...args) => execFileSync('tmux', ['-L', SOCKET, ...args]);
+
+/** Демо-переписка для ленты (журнал Claude Code в том же формате, что настоящий). */
+function demoTranscript() {
+  const recs = [];
+  let n = 0;
+  const id = () => `demo-${n++}`;
+  const user = (text) => recs.push({ type: 'user', uuid: id(), message: { role: 'user', content: text } });
+  const say = (text) => recs.push({ type: 'assistant', uuid: id(), message: { role: 'assistant', content: [{ type: 'text', text }] } });
+  const tool = (name, input, result) => {
+    const tid = `toolu_${n}`;
+    recs.push({ type: 'assistant', uuid: id(), message: { role: 'assistant', content: [{ type: 'tool_use', id: tid, name, input }] } });
+    recs.push({ type: 'user', uuid: id(), message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: tid, content: result }] } });
+  };
+  user('Добавь экран паузы в игру, открывать по Esc');
+  recs.push({ type: 'assistant', uuid: id(), message: { role: 'assistant', content: [{ type: 'thinking', thinking: '…' }] } });
+  tool('Read', { file_path: '/home/user/neon-requiem/scenes/main.tscn' }, '[gd_scene load_steps=12 format=3]\n…');
+  tool('Write', { file_path: '/home/user/neon-requiem/scenes/ui/pause_menu.tscn', content: '…' }, 'File created successfully');
+  tool('Bash', { command: 'godot --headless --quit-after 60 scenes/main.tscn' }, 'Godot Engine v4.5 - https://godotengine.org\nOK');
+  say('Готово. Экран паузы:\n\n- открывается по **Esc** и останавливает игру (`get_tree().paused`);\n- кнопки «Продолжить», «Настройки», «Выход в меню»;\n- сцена `scenes/ui/pause_menu.tscn`, подключена в `main.tscn`.\n\nПроверил в headless Godot — ошибок нет.');
+  return `${recs.map((r) => JSON.stringify(r)).join('\n')}\n`;
+}
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function setupDemo() {
@@ -23,9 +46,11 @@ function setupDemo() {
   } catch {
     // сервера не было
   }
-  tmux('new-session', '-d', '-s', 'claude-gui', '-x', '120', '-y', '30', '-c', ROOT);
-  tmux('send-keys', '-t', '=claude-gui:', 'clear; git log --oneline | head -12; cat', 'Enter');
+  const seed = join(CLAUDE_DIR, 'seed.jsonl');
+  writeFileSync(seed, demoTranscript());
+  tmux('new-session', '-d', '-s', 'claude-game', '-x', '120', '-y', '30', '-c', ROOT, `CVG_CLAUDE_DIR=${CLAUDE_DIR} CVG_FAKE_SEED=${seed} node ${FAKE}`);
   tmux('new-session', '-d', '-s', 'claude-site', '-c', '/tmp', 'cat');
+  tmux('new-session', '-d', '-s', 'claude-finder', '-c', '/tmp', 'cat');
   tmux('new-session', '-d', '-s', 'notes', '-c', homedir());
 }
 
@@ -44,6 +69,7 @@ async function launch(cfg, extraEnv = {}) {
       CVG_TMUX_SOCKET: SOCKET,
       CVG_DEMO_HOST: '203.0.113.10',
       CVG_FAKE_CLAUDE: '1',
+      CVG_CLAUDE_DIR: CLAUDE_DIR,
       ...extraEnv,
     },
   });
@@ -58,10 +84,12 @@ const shot = (page, name) => page.screenshot({ path: join(OUT, name) });
 async function mainScreens(theme) {
   const { app, page } = await launch({ ...base, theme });
   const nav = page.getByRole('navigation', { name: 'Сессии' });
-  await nav.getByRole('button', { name: /claude-gui/ }).click({ timeout: 20_000 });
-  await sleep(1500);
+  await nav.getByRole('button', { name: /claude-game/ }).click({ timeout: 20_000 });
+  await page.getByRole('region', { name: 'Переписка' }).getByText('Готово. Экран паузы:').waitFor({ timeout: 20_000 });
+  await sleep(1000);
   const box = page.getByLabel('Сообщение для Claude');
   if (theme === 'light') {
+    await page.getByRole('region', { name: 'Переписка' }).getByRole('button', { name: /Bash/ }).click();
     await box.fill('/m');
     await page.getByRole('listbox', { name: 'Подсказки' }).waitFor({ timeout: 30_000 });
     await sleep(300);
@@ -75,6 +103,36 @@ async function mainScreens(theme) {
     await page.getByLabel('Имя сессии tmux').fill('claude-docs');
     await sleep(300);
     await shot(page, '04-new-session.png');
+    await page.getByRole('button', { name: 'Отмена' }).click();
+    // Карточка меню Claude Code
+    await box.fill('menu');
+    await box.press('Enter');
+    await page.getByRole('group', { name: 'Выбор' }).waitFor({ timeout: 15_000 });
+    await sleep(500);
+    await shot(page, '06-menu-card.png');
+    await page.keyboard.press('Escape');
+    // Закрепление и группа
+    await nav.getByRole('button', { name: /^claude-game/ }).click({ button: 'right' });
+    await page.getByRole('menuitem', { name: 'Закрепить' }).click();
+    for (const name of ['claude-site', 'claude-finder']) {
+      await nav.getByRole('button', { name: new RegExp(`^${name}`) }).click({ button: 'right' });
+      await page.getByRole('menuitem', { name: 'Переместить в группу' }).click();
+      if (name === 'claude-site') {
+        await page.getByRole('menuitem', { name: 'Новая группа…' }).click();
+        await page.getByLabel('Название группы').fill('Работа');
+        await page.getByRole('button', { name: 'Создать' }).click();
+      } else await page.getByRole('menuitem', { name: 'Работа' }).click();
+    }
+    await nav.getByRole('button', { name: /^notes/ }).click({ button: 'right' });
+    await page.getByRole('menuitem', { name: 'Переместить в группу' }).hover();
+    await sleep(400);
+    await shot(page, '08-sessions.png');
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Escape');
+    // Панель «Сервер»: ждём несколько замеров для графиков
+    await nav.getByRole('button', { name: 'Сервер' }).click();
+    await sleep(9000);
+    await shot(page, '07-server.png');
   } else {
     await app.evaluate(async ({ clipboard, ClipboardItem }, b64) => {
       await clipboard.write([new ClipboardItem({ 'image/png': new Blob([Buffer.from(b64, 'base64')], { type: 'image/png' }) })]);
@@ -107,6 +165,7 @@ try {
   console.log(`Скриншоты сохранены в ${OUT}`);
 } finally {
   tmux('kill-server');
+  rmSync(CLAUDE_DIR, { recursive: true, force: true });
   // Загруженную демо-картинку убираем
   execFileSync('sh', ['-c', 'find "$HOME/.cache/claude-vm-gui/uploads" -type f -mmin -10 -size -1024c -delete 2>/dev/null; true']);
 }

@@ -84,7 +84,8 @@ test('сквозной сценарий: сессия, подсказки, ка�
     await page.locator('.xterm').click();
     await page.keyboard.type('after-reconnect');
     await page.keyboard.press('Enter');
-    await expect.poll(pane).toMatch(/after-reconnect[\s\S]*after-reconnect/);
+    // Ввод после переподключения доходит до сессии; переносы строк не важны (tmux мог на миг сменить ширину окна)
+    await expect.poll(() => pane().replace(/\s+/g, '')).toMatch(/after-reconnect.*after-reconnect/);
 
     // Завершение
     await page.getByRole('button', { name: 'Завершить сессию' }).click();
