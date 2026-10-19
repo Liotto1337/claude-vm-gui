@@ -18,7 +18,9 @@ export type ErrorCode =
   | 'UPLOAD_TOO_BIG'
   | 'UPLOAD_FAILED'
   | 'HINTS_FAILED'
-  | 'CONFIG_INVALID';
+  | 'CONFIG_INVALID'
+  | 'SEND_NOT_CONFIRMED'
+  | 'NO_TRANSCRIPT';
 
 export interface VmConfig {
   host: string;

@@ -5,13 +5,27 @@ import { fail, ok, type ExitReason, type Result } from '@shared/ipc';
 import { dialogOpen } from '@shared/dialog';
 import { bracketedPaste, slashCommand } from '@shared/paste';
 import { validateSessionName } from '@shared/quote';
+import { inputText } from '@shared/screen-parse';
 import type { SshConnection } from './ssh';
 import { exactPane, exactTarget, tmuxCmd, type TmuxService } from './tmux';
 
 const NO_CLAUDE_TEXT = 'В сессии сейчас не claude, а обычная оболочка — текст выполнился бы как команда. Запустите claude.';
 const CHECK_FAILED_TEXT = 'Не удалось проверить терминал. Попробуйте ещё раз.';
+const NOT_CONFIRMED_TEXT = 'Claude Code не принял Enter. Посмотрите в терминал.';
 const PROMPT_OPEN_TEXT =
   'В терминале открыто меню Claude Code (например, запрос разрешения). Ответьте прямо в терминале и повторите.';
+
+/** Паузы отправки: опрос экрана, ожидание готовности поля, подтверждение, пауза без распознанного поля. */
+export interface SendTimings { pollMs: number; settleMaxMs: number; confirmMs: number; fallbackMs: number }
+const DEFAULT_TIMINGS: SendTimings = { pollMs: 60, settleMaxMs: 3000, confirmMs: 1500, fallbackMs: 300 };
+
+export interface TerminalOptions {
+  /** Снимок экрана сессии с атрибутами (`capture-pane -e`); null — не удалось. */
+  probe?: (session: string) => Promise<string | null>;
+  timings?: SendTimings;
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /**
  * Терминал открытой tmux-сессии: канал `tmux attach` с PTY.
@@ -24,8 +38,13 @@ export class TerminalService extends EventEmitter {
   /** Номер последнего open: ответ более раннего open, пришедший позже, закрывается */
   private generation = 0;
 
-  constructor(private readonly conn: SshConnection, private readonly tmux: TmuxService) {
+  private readonly probe: (session: string) => Promise<string | null>;
+  private readonly timings: SendTimings;
+
+  constructor(private readonly conn: SshConnection, private readonly tmux: TmuxService, opts: TerminalOptions = {}) {
     super();
+    this.probe = opts.probe ?? ((name) => this.capture(name));
+    this.timings = opts.timings ?? DEFAULT_TIMINGS;
     // После автопереподключения возвращаемся в ту же сессию
     // Событие `reattached` — терминал снова подключён (или подключать было нечего)
     conn.on('reconnected', () => {
@@ -136,12 +155,68 @@ export class TerminalService extends EventEmitter {
     }
   }
 
+  private async capture(name: string): Promise<string | null> {
+    try {
+      const r = await this.conn.exec(`${tmuxCmd()} capture-pane -e -p -t ${exactPane(name)}`, { timeoutMs: 2000 });
+      return r.code === 0 ? r.stdout : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private async field(name: string): Promise<string | null> {
+    const screen = await this.probe(name);
+    return screen === null ? null : inputText(screen);
+  }
+
+  /** Ждёт, пока поле ввода изменится (сообщение принято) или пройдёт ms. */
+  private async accepted(name: string, before: string, ms: number): Promise<boolean> {
+    for (const t = Date.now(); Date.now() - t < ms; ) {
+      await sleep(this.timings.pollMs);
+      const now = await this.field(name);
+      if (now !== null && (now === '' || now !== before)) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Сообщение: вставка, затем Enter — только когда Claude Code закончил обрабатывать вставку
+   * (картинку, длинный текст). Enter, склеенный с концом вставки, Claude Code теряет.
+   * Если поле не изменилось — ровно один повтор Enter, потом ошибка.
+   */
   async send(text: string, imagePaths: string[]): Promise<Result<void>> {
-    // Enter отдельной записью: в одном куске с концом вставки TUI мог бы принять его за часть текста
     const data = bracketedPaste(text, imagePaths);
+    const name = this.session;
     const r = await this.writeChecked(() => data.slice(0, -1));
-    if (r.ok) setTimeout(() => this.stream?.write('\r'), 30);
-    return r;
+    if (!r.ok || !name) return r;
+    const t = this.timings;
+
+    let prev: string | null = null;
+    let ready: string | null = null;
+    let recognized = false;
+    for (const start = Date.now(); Date.now() - start < t.settleMaxMs; ) {
+      await sleep(t.pollMs);
+      const now = await this.field(name);
+      if (now !== null) recognized = true;
+      if (now && now === prev) {
+        ready = now;
+        break;
+      }
+      prev = now;
+    }
+    if (!recognized) {
+      // Поле не распознано (другой вид экрана) — как раньше, но с запасом на обработку вставки
+      await sleep(t.fallbackMs);
+      this.stream?.write('\r');
+      return ok(undefined);
+    }
+    const before = ready ?? prev ?? '';
+    for (let attempt = 0; attempt < 2; attempt++) {
+      if (!this.stream || this.session !== name) return fail('NO_SESSION', 'Сессия не открыта');
+      this.stream.write('\r');
+      if (await this.accepted(name, before, t.confirmMs)) return ok(undefined);
+    }
+    return fail('SEND_NOT_CONFIRMED', NOT_CONFIRMED_TEXT);
   }
 
   async setModel(value: string): Promise<Result<void>> {

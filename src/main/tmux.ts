@@ -57,7 +57,9 @@ export class TmuxService {
 
   async startClaude(name: string): Promise<Result<void>> {
     if (!validateSessionName(name)) return fail('BAD_NAME', BAD_NAME);
-    const r = await this.conn.exec(`${tmuxCmd()} send-keys -t ${exactPane(name)} claude Enter`);
+    // CVG_CLAUDE_CMD — своя команда вместо claude (тесты: фейковый claude)
+    const cmd = process.env.CVG_CLAUDE_CMD ?? 'claude';
+    const r = await this.conn.exec(`${tmuxCmd()} send-keys -t ${exactPane(name)} ${shellQuote(cmd)} Enter`);
     return r.code === 0 ? ok(undefined) : fail('NO_SESSION', `Сессии ${name} нет`);
   }
 
