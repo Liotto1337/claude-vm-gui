@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react';
 import type {
-  ChatItem, ConnectionState, ErrorCode, Hints, HostKeyPrompt, PreflightEvent, PreflightStep, ScreenState, SidebarLayout,
-  TmuxSession, VmConfig,
+  ChatItem, ConnectionState, ErrorCode, Hints, HostKeyPrompt, MetricsSample, PreflightEvent, PreflightStep, ScreenState,
+  SidebarLayout, SystemInfo, TmuxSession, VmConfig,
 } from '@shared/ipc';
 import { mergeItems } from './view-mode';
 import { EMPTY, reconcile } from '@shared/layout';
@@ -29,6 +29,11 @@ export interface AppState {
   chat: Record<string, ChatState>;
   /** Пользователь выбрал «Терминал» для открытой сессии */
   viewOverride: 'terminal' | null;
+  /** Удачные замеры параметров ВМ (последние 5 минут) и время последней ошибки замера */
+  metrics: MetricsSample[];
+  metricsErrorAt: number | null;
+  systemInfo: SystemInfo | null;
+  serverOpen: boolean;
 }
 
 export interface ChatState {
@@ -56,7 +61,13 @@ let state: AppState = {
   layout: EMPTY,
   chat: {},
   viewOverride: null,
+  metrics: [],
+  metricsErrorAt: null,
+  systemInfo: null,
+  serverOpen: false,
 };
+
+const METRICS_WINDOW_MS = 5 * 60_000;
 
 function patchChat(session: string | null | undefined, patch: (c: ChatState) => Partial<ChatState>): void {
   if (!session) return;
@@ -99,6 +110,8 @@ export async function connect(): Promise<void> {
   setState({ view: 'connect', preflight: {}, connectError: null, hostKey: null });
   const r = await api.connection.connect();
   if (r.ok) {
+    setState({ metrics: [], metricsErrorAt: null, systemInfo: null });
+    void api.metrics.info().then((i) => i.ok && setState({ systemInfo: i.data }));
     const [list, saved] = await Promise.all([api.tmux.list(), api.layout.get()]);
     const sessions = list.ok ? list.data : [];
     const last = state.config?.lastSession;
@@ -143,6 +156,10 @@ export async function init(): Promise<void> {
   api.chat.onItems((e) => patchChat(e.session, (c) => ({ items: mergeItems(c.items, e), hasEarlier: e.hasEarlier, unavailable: null })));
   api.chat.onScreen((e) => patchChat(e.session, () => ({ screen: e.state, busy: e.busy })));
   api.chat.onUnavailable((e) => patchChat(e.session, () => ({ unavailable: e.reason })));
+  api.metrics.onSample((s) => {
+    if (s.error) return setState({ metricsErrorAt: state.metricsErrorAt ?? s.t });
+    setState({ metrics: [...state.metrics.filter((m) => s.t - m.t <= METRICS_WINDOW_MS), s], metricsErrorAt: null });
+  });
   setState({ config, systemTheme, view: config ? 'connect' : 'settings' });
   if (config) void connect();
 }
@@ -214,4 +231,10 @@ export function displayHost(host: string): string {
 
 export function setViewOverride(v: 'terminal' | null): void {
   setState({ viewOverride: v });
+}
+
+/** Панель «Сервер»: открыта — замеры раз в 2 с, закрыта — раз в 10 с. */
+export function setServerOpen(open: boolean): void {
+  setState({ serverOpen: open });
+  api.metrics.setActive(open);
 }

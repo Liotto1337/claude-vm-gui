@@ -1,0 +1,4 @@
+Filesystem             1-blocks        Used   Available Capacity Mounted on
+/dev/mapper/vg-root 62238789632 21332631552 38204829696      36% /
+/dev/sda2             990052352   269127680   656461824      30% /boot
+remote:             16106127360  1630498816 14475628544      11% /mnt/remote

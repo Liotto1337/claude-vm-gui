@@ -6,11 +6,12 @@ import { ChatView } from './ChatView';
 import { Composer } from './Composer';
 import { NewSessionDialog } from './NewSessionDialog';
 import { SessionHeader } from './SessionHeader';
+import { ServerPanel } from './ServerPanel';
 import { Sidebar } from './Sidebar';
 import { TerminalView } from './TerminalView';
 
 export function MainView() {
-  const { sessions, current, chat, viewOverride } = useAppState();
+  const { sessions, current, chat, viewOverride, serverOpen } = useAppState();
   const [newSession, setNewSession] = useState(false);
   const session = sessions.find((s) => s.name === current) ?? null;
   const c = session ? chat[session.name] : undefined;
@@ -46,6 +47,7 @@ export function MainView() {
           <div className="empty-state">Выберите сессию слева или создайте новую</div>
         )}
       </main>
+      {serverOpen ? <ServerPanel /> : null}
       {newSession ? <NewSessionDialog onClose={() => setNewSession(false)} /> : null}
     </div>
   );

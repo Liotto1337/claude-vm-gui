@@ -1,0 +1,5 @@
+   1201    1100 14.2 421888 claude          claude
+   1340    1100  6.1 192512 node            node /usr/lib/node_modules/vite/bin/vite.js
+   1202    1150  2.0 308224 claude          claude
+    880       1  1.1  98304 python3         python3 -m http.server
+    700       1  0.3  51200 sshd            sshd: /usr/sbin/sshd -D

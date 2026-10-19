@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { fail, ok, type HostKeyPrompt, type ImageExt, type MenuKey, type Result } from '@shared/ipc';
 import { transcriptPath } from '@shared/claude-session';
 import { HintsService } from './hints';
+import { MetricsService } from './metrics';
 import { SessionWatcher } from './session-watch';
 import { TranscriptService } from './transcript';
 import type { IpcHub } from './ipc';
@@ -25,6 +26,7 @@ interface Services {
   upload: UploadService;
   watch: SessionWatcher;
   transcript: TranscriptService;
+  metrics: MetricsService;
   claudeDir: string;
   stopPolling: () => void;
 }
@@ -72,6 +74,8 @@ export class AppController {
     h.handle('term:setModel', (v: string) => this.need((s) => s.term.setModel(v)));
     h.handle('term:setEffort', (v: string) => this.need((s) => s.term.setEffort(v)));
 
+    h.listen('metrics:setActive', (fast: boolean) => this.s?.metrics.setActive(fast === true));
+    h.handle('metrics:info', () => this.need((s) => s.metrics.info()));
     h.handle('chat:key', (k: MenuKey) => this.need((s) => s.term.key(k)));
     h.handle('chat:loadEarlier', () => this.need((s) => s.transcript.loadEarlier()));
 
@@ -179,6 +183,8 @@ export class AppController {
     const watch = new SessionWatcher(conn, { claudeDir });
     const transcript = new TranscriptService(conn);
     this.wireChat(watch, transcript, claudeDir);
+    const metrics = new MetricsService(conn, { claudeDir });
+    metrics.on('sample', (smp) => this.hub.emit('metrics:sample', smp));
     // После переподключения терминал снова в сессии — перезапускаем ленту
     term.on('reattached', () => {
       if (this.s && term.current) this.startChat(this.s, term.current);
@@ -187,7 +193,8 @@ export class AppController {
     upload.on('progress', (p) => this.hub.emit('upload:progress', p));
     const hints = new HintsService(conn);
     const stopPolling = tmux.startPolling((sessions) => this.hub.emit('tmux:sessions', sessions));
-    this.s = { conn, tmux, term, hints, upload, watch, transcript, claudeDir, stopPolling };
+    this.s = { conn, tmux, term, hints, upload, watch, transcript, metrics, claudeDir, stopPolling };
+    metrics.start();
     void upload.cleanup();
     return ok(undefined);
   }
@@ -204,6 +211,7 @@ export class AppController {
     this.s = null;
     if (!s) return;
     s.stopPolling();
+    s.metrics.stop();
     this.stopChat(s);
     s.term.close();
     s.conn.close();

@@ -89,6 +89,20 @@ export interface UploadProgress {
 
 export type ImageExt = 'png' | 'jpg' | 'gif' | 'webp';
 
+/** Замер параметров ВМ (панель «Сервер»). Байты и байт/с; null — нет данных. */
+export interface MetricsSample {
+  t: number;
+  cpu: number | null;
+  load: [number, number, number] | null;
+  uptimeSec: number | null;
+  mem: { total: number; used: number; swapTotal: number; swapUsed: number } | null;
+  disks: { mount: string; total: number; used: number }[];
+  net: { iface: string; rxRate: number; txRate: number } | null;
+  procs: { pid: number; name: string; cpu: number; rss: number; session: string | null }[];
+  error: string | null;
+}
+export interface SystemInfo { os: string; kernel: string; cores: number; claudeVersion: string | null }
+
 /** Элемент ленты переписки (из журнала Claude Code). */
 export type ChatItem =
   | { kind: 'user'; id: string; text: string; images: number }
@@ -162,6 +176,11 @@ export interface Api {
   clipboard: { read(): Promise<string>; write(text: string): void };
   layout: { get(): Promise<SidebarLayout>; save(l: SidebarLayout): Promise<Result<void>> };
   links: { open(url: string): void };
+  metrics: {
+    setActive(fast: boolean): void;
+    onSample(cb: (s: MetricsSample) => void): Unsubscribe;
+    info(): Promise<Result<SystemInfo>>;
+  };
   chat: {
     onItems(cb: (e: ChatEvent) => void): Unsubscribe;
     onScreen(cb: (e: ScreenEvent) => void): Unsubscribe;

@@ -1,10 +1,10 @@
-import { displayHost, openSettings, useAppState } from '../state';
-import { IconGear, IconPlus } from './icons';
+import { displayHost, openSettings, setServerOpen, useAppState } from '../state';
+import { IconGear, IconPlus, IconPulse } from './icons';
 import { Logo } from './Logo';
 import { SessionList } from './SessionList';
 
 export function Sidebar({ onNewSession }: { onNewSession: () => void }) {
-  const { config, connection } = useAppState();
+  const { config, connection, serverOpen } = useAppState();
   const online = connection.state === 'connected';
   return (
     <nav aria-label="Сессии" className="sidebar">
@@ -22,10 +22,16 @@ export function Sidebar({ onNewSession }: { onNewSession: () => void }) {
         Новая сессия
       </button>
       <SessionList />
-      <button type="button" className="btn-ghost settings-btn" onClick={openSettings}>
-        <IconGear />
-        Настройки подключения
-      </button>
+      <div className="sidebar-foot">
+        <button type="button" className="btn-ghost server-btn" aria-pressed={serverOpen} onClick={() => setServerOpen(!serverOpen)}>
+          <IconPulse />
+          Сервер
+        </button>
+        <button type="button" className="btn-ghost settings-btn" onClick={openSettings}>
+          <IconGear />
+          Настройки подключения
+        </button>
+      </div>
     </nav>
   );
 }
