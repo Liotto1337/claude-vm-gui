@@ -12,7 +12,8 @@ import { TerminalView } from './TerminalView';
 
 export function MainView() {
   const { sessions, current, chat, viewOverride, serverOpen } = useAppState();
-  const [newSession, setNewSession] = useState(false);
+  // Диалог новой сессии; group — сразу положить её в эту группу
+  const [newSession, setNewSession] = useState<{ group?: string } | null>(null);
   const session = sessions.find((s) => s.name === current) ?? null;
   const c = session ? chat[session.name] : undefined;
   // Пока claude работает — лента; терминал — без claude, на незнакомом экране или по выбору
@@ -23,7 +24,7 @@ export function MainView() {
 
   return (
     <div className="main-layout">
-      <Sidebar onNewSession={() => setNewSession(true)} />
+      <Sidebar onNewSession={(group) => setNewSession({ group })} />
       <main className="main-column">
         <Banner />
         {session ? (
@@ -48,7 +49,7 @@ export function MainView() {
         )}
       </main>
       {serverOpen ? <ServerPanel /> : null}
-      {newSession ? <NewSessionDialog onClose={() => setNewSession(false)} /> : null}
+      {newSession ? <NewSessionDialog group={newSession.group} onClose={() => setNewSession(null)} /> : null}
     </div>
   );
 }

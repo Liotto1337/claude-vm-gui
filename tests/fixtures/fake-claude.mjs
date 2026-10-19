@@ -2,7 +2,7 @@
 // Фейковый Claude Code для тестов: рисует поле ввода как настоящий (линии «─», «❯», серая подсказка),
 // включает bracketed paste и воспроизводит баг: вставка «обрабатывается» 250 мс, всё пришедшее за это время
 // (в том числе Enter) теряется. Пишет sessions/<pid>.json и журнал, если задан CVG_CLAUDE_DIR.
-// Команды: «menu» — меню из трёх вариантов; «busy» — 3 с «работы».
+// Команды: «menu» — меню из трёх вариантов; «busy» — 3 с «работы»; «long» — длинный ответ в журнал.
 // CVG_FAKE_SLOW_ACCEPT=1 — поле очищается через 1200 мс после Enter. CVG_FAKE_SEED — начальный журнал (копируется при старте).
 import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
@@ -81,7 +81,9 @@ function submit() {
   field = '';
   pasted = null;
   images = 0;
-  if (text.trim() === 'menu') {
+  if (text.trim() === 'long') {
+    record('assistant', `Длинный ответ для проверки «печати». ${'Текст абзаца идёт дальше и дальше. '.repeat(18)}Конец ответа.`);
+  } else if (text.trim() === 'menu') {
     menu = { selected: 0 };
     writeSession('waiting');
   } else if (text.trim() === 'busy') {

@@ -2,6 +2,7 @@ import { memo, useState } from 'react';
 import type { ChatItem } from '@shared/ipc';
 import { IconChevron, IconChevronRight, IconImage } from './icons';
 import { Markdown } from './Markdown';
+import { TypedMarkdown } from './TypedMarkdown';
 
 type Tool = Extract<ChatItem, { kind: 'tool' }>;
 const PREVIEW_LINES = 20;
@@ -57,8 +58,10 @@ function ToolView({ tool }: { tool: Tool }) {
   );
 }
 
-/** Один элемент ленты. */
-export const ChatItemView = memo(function ChatItemView({ item }: { item: ChatItem }) {
+/**
+ * Один элемент ленты. typingSince — ответ только что пришёл и «печатается»; onTyped — «печать» закончилась.
+ */
+export const ChatItemView = memo(function ChatItemView({ item, typingSince, onTyped }: { item: ChatItem; typingSince?: number; onTyped?: () => void }) {
   switch (item.kind) {
     case 'user':
       return (
@@ -75,7 +78,7 @@ export const ChatItemView = memo(function ChatItemView({ item }: { item: ChatIte
         </div>
       );
     case 'assistant':
-      return <Markdown text={item.text} />;
+      return typingSince !== undefined && onTyped ? <TypedMarkdown text={item.text} since={typingSince} onDone={onTyped} /> : <Markdown text={item.text} />;
     case 'thinking':
       return <div className="thinking caption">Размышления</div>;
     case 'note':

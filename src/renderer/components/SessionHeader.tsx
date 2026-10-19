@@ -22,7 +22,7 @@ export function SessionHeader({ session, mode = 'terminal' }: { session: TmuxSes
           <button type="button" aria-pressed={mode === 'terminal'} onClick={() => setViewOverride('terminal')}>Терминал</button>
         </div>
       ) : null}
-      <button type="button" className="btn btn-sm" onClick={() => setConfirm(true)}>
+      <button type="button" className="btn btn-sm btn-kill" onClick={() => setConfirm(true)}>
         <IconClose />
         Завершить сессию
       </button>

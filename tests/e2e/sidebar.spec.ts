@@ -178,3 +178,41 @@ test('раскладка переживает два перезапуска бе
     }
   }
 });
+
+test('новая сессия из меню группы попадает в группу', async () => {
+  const { app, page } = await open();
+  try {
+    await item(page, 'cvg-test-a').click({ button: 'right' });
+    await menuItem(page, 'Переместить в группу').click();
+    await menuItem(page, 'Новая группа…').click();
+    await page.getByRole('dialog', { name: 'Новая группа' }).getByLabel('Название группы').fill('Работа');
+    await page.getByRole('dialog', { name: 'Новая группа' }).getByRole('button', { name: 'Создать' }).click();
+    await nav(page).getByRole('button', { name: /^Группа Работа/ }).click({ button: 'right' });
+    await menuItem(page, 'Новая сессия…').click();
+    const dialog = page.getByRole('dialog', { name: 'Новая сессия' });
+    await dialog.getByLabel('Имя сессии tmux').fill('cvg-test-ing');
+    await dialog.getByLabel('Сразу запустить claude').uncheck();
+    await dialog.getByRole('button', { name: 'Создать' }).click();
+    await expect(nav(page).locator('li.in-group', { hasText: 'cvg-test-ing' })).toBeVisible({ timeout: 10_000 });
+    await expect(nav(page).getByRole('button', { name: /^Группа Работа/ })).toContainText('2');
+  } finally {
+    await app.close();
+  }
+});
+
+test('ПКМ по пустому месту списка: новая группа', async () => {
+  const { app, page } = await open();
+  try {
+    const box = nav(page).locator('.session-box');
+    const b = (await box.boundingBox())!;
+    await box.click({ button: 'right', position: { x: b.width / 2, y: b.height - 20 } });
+    await expect(page.getByRole('menu', { name: 'Список сессий' })).toBeVisible();
+    await expect(menuItem(page, 'Новая сессия…')).toBeVisible();
+    await menuItem(page, 'Новая группа…').click();
+    await page.getByRole('dialog', { name: 'Новая группа' }).getByLabel('Название группы').fill('Пустая');
+    await page.getByRole('dialog', { name: 'Новая группа' }).getByRole('button', { name: 'Создать' }).click();
+    await expect(nav(page).getByRole('button', { name: /^Группа Пустая, сессий: 0/ })).toBeVisible();
+  } finally {
+    await app.close();
+  }
+});

@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 import { execFileSync } from 'node:child_process';
 import { expect, test } from '@playwright/test';
 import { hasTestKey, launchApp, TEST_KEY, trustedKnownHosts, withConfig } from './helpers';
@@ -26,6 +27,15 @@ test('панель «Сервер»: разделы, график, Esc закр�
     await expect(panel.getByText('Ядро')).toBeVisible({ timeout: 15_000 });
     const chart = panel.getByRole('img', { name: /Загрузка процессора/ });
     await expect.poll(async () => Number(await chart.getAttribute('data-points')), { timeout: 15_000 }).toBeGreaterThanOrEqual(2);
+    // Таблица процессов с рамками у ячеек
+    const cell = panel.locator('.procs td').first();
+    await expect(cell).toBeVisible({ timeout: 15_000 });
+    const border = await cell.evaluate((td) => {
+      const cs = getComputedStyle(td);
+      return [cs.borderTopStyle, cs.borderLeftStyle, cs.borderTopWidth];
+    });
+    expect(border.slice(0, 2)).toEqual(['solid', 'solid']);
+    expect(border[2]).not.toBe('0px');
     await page.keyboard.press('Escape');
     await expect(panel).toBeHidden();
     await expect(button).toBeFocused();

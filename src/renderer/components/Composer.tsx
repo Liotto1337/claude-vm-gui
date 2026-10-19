@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ClipboardEvent, type DragEve
 import { detectTrigger, filterHints, type Trigger } from '@shared/hints';
 import type { HintCommand, Hints, ImageExt, ModelInfo, ParsedMenu, TmuxSession } from '@shared/ipc';
 import { api } from '../api';
-import { refreshSessions, rememberChoice, useAppState } from '../state';
+import { addPending, dropPending, markPendingSent, refreshSessions, rememberChoice, useAppState } from '../state';
 import { AttachmentChip, type Attachment } from './AttachmentChip';
 import { ChoiceMenu } from './ChoiceMenu';
 import { HintPopup, type HintItem } from './HintPopup';
@@ -115,14 +115,18 @@ export function Composer({ session, menu = null, working = false, chatMode = fal
     if (!canSend || sending.current) return;
     sending.current = true;
     setBusy(true);
+    // Сообщение сразу в ленте (темнее), пока идёт отправка
+    const pendingId = addPending(session.name, text.trim(), ready.length);
     const r = await api.term.send(text, ready.map((a) => a.remotePath!)).finally(() => {
       sending.current = false;
       setBusy(false);
     });
     if (!r.ok) {
+      dropPending(session.name, pendingId);
       setSendError(r.error.message);
       return;
     }
+    markPendingSent(session.name, pendingId);
     setSendError(null);
     for (const a of attachments) URL.revokeObjectURL(a.url);
     setAttachments([]);

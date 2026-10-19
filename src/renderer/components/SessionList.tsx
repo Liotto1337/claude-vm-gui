@@ -8,7 +8,7 @@ import { killSession, openSession, shortPath, updateLayout, useAppState } from '
 import { ConfirmDialog } from './ConfirmDialog';
 import { ContextMenu, type MenuEntry } from './ContextMenu';
 import { GroupNameDialog } from './GroupNameDialog';
-import { IconChevron, IconChevronLeft, IconChevronRight, IconClose, IconFolder, IconPin } from './icons';
+import { IconChevron, IconChevronLeft, IconChevronRight, IconClose, IconFolder, IconPin, IconPlus } from './icons';
 
 /** Высоты строк — как в app.css (.row-*): по ним список делится на страницы. */
 export const ROW_HEIGHTS = { section: 28, divider: 17, group: 34, session: 52 } as const;
@@ -18,7 +18,8 @@ const DND = 'application/x-cvg';
 
 type Group = Extract<LayoutItem, { kind: 'group' }>;
 type Drop = { key: string; edge: 'before' | 'after' | 'into' } | null;
-type Menu = { x: number; y: number; ref: ItemRef } | null;
+/** ref — сессия или группа; list — пустое место списка */
+type Menu = { x: number; y: number; ref: ItemRef | 'list' } | null;
 type Dialog =
   | { kind: 'new-group'; session?: string }
   | { kind: 'rename'; id: string; name: string }
@@ -44,7 +45,8 @@ function whereIs(l: SidebarLayout, name: string): { group: Group | null; index: 
 const groupById = (l: SidebarLayout, id: string) => l.items.find((i): i is Group => i.kind === 'group' && i.id === id) ?? null;
 const groupIndex = (l: SidebarLayout, id: string) => l.items.findIndex((i) => i.kind === 'group' && i.id === id);
 
-export function SessionList() {
+/** onNewSession — диалог новой сессии (group — сразу в эту группу). */
+export function SessionList({ onNewSession }: { onNewSession: (group?: string) => void }) {
   const { sessions, current, layout } = useAppState();
   const byName = useMemo(() => new Map(sessions.map((s) => [s.name, s])), [sessions]);
   const live = useMemo(() => new Set(byName.keys()), [byName]);
@@ -180,6 +182,23 @@ export function SessionList() {
   };
 
   // ── Меню ──
+  const listItems: MenuEntry[] = [
+    { label: 'Новая сессия…', icon: <IconPlus />, onSelect: () => onNewSession() },
+    { label: 'Новая группа…', icon: <IconFolder />, onSelect: () => setDialog({ kind: 'new-group' }) },
+  ];
+  // ПКМ и Shift+F10 по пустому месту списка (не по сессии и не по группе)
+  const onListContext = (e: MouseEvent) => {
+    if ((e.target as HTMLElement).closest('button, [role="menu"], [role="dialog"]')) return;
+    e.preventDefault();
+    setMenu({ x: e.clientX, y: e.clientY, ref: 'list' });
+  };
+  const onListKey = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.target !== e.currentTarget || !((e.shiftKey && e.key === 'F10') || e.key === 'ContextMenu')) return;
+    e.preventDefault();
+    const r = e.currentTarget.getBoundingClientRect();
+    setMenu({ x: r.left + 24, y: r.top + 24, ref: 'list' });
+  };
+
   const menuItems = (ref: ItemRef): MenuEntry[] => {
     if ('group' in ref) {
       const g = groupById(layout, ref.group);
@@ -188,6 +207,7 @@ export function SessionList() {
         { label: g.pinned ? 'Открепить' : 'Закрепить', icon: <IconPin size={14} />, onSelect: () => updateLayout((l) => togglePin(l, ref)) },
         { label: g.collapsed ? 'Развернуть' : 'Свернуть', onSelect: () => updateLayout((l) => toggleCollapsed(l, g.id)) },
         { label: 'Переименовать…', onSelect: () => setDialog({ kind: 'rename', id: g.id, name: g.name }) },
+        { label: 'Новая сессия…', icon: <IconPlus />, onSelect: () => onNewSession(g.id) },
         { label: '', separator: true },
         { label: 'Удалить группу', danger: true, icon: <IconClose />, onSelect: () => setDialog({ kind: 'delete-group', id: g.id, name: g.name }) },
       ];
@@ -279,7 +299,7 @@ export function SessionList() {
   const shown = pages[pageIdx] ?? [];
   const menuRef = menu?.ref;
   return (
-    <div className="session-box" ref={box}>
+    <div className="session-box" ref={box} tabIndex={-1} onContextMenu={onListContext} onKeyDown={onListKey}>
       <ul className="session-list">
         {shown.map((r, i) => {
           if (r.kind === 'section') return <li key={`sec-${i}`} className="row-section caption">{r.label}</li>;
@@ -305,10 +325,16 @@ export function SessionList() {
 
       {menu && menuRef ? (
         <ContextMenu
-          label={'session' in menuRef ? `Действия с сессией ${menuRef.session}` : `Действия с группой ${groupById(layout, menuRef.group)?.name ?? ''}`}
+          label={
+            menuRef === 'list'
+              ? 'Список сессий'
+              : 'session' in menuRef
+                ? `Действия с сессией ${menuRef.session}`
+                : `Действия с группой ${groupById(layout, menuRef.group)?.name ?? ''}`
+          }
           x={menu.x}
           y={menu.y}
-          items={menuItems(menuRef)}
+          items={menuRef === 'list' ? listItems : menuItems(menuRef)}
           onClose={() => setMenu(null)}
         />
       ) : null}

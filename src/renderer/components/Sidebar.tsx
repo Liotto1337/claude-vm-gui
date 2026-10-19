@@ -3,7 +3,7 @@ import { IconGear, IconPlus, IconPulse } from './icons';
 import { Logo } from './Logo';
 import { SessionList } from './SessionList';
 
-export function Sidebar({ onNewSession }: { onNewSession: () => void }) {
+export function Sidebar({ onNewSession }: { onNewSession: (group?: string) => void }) {
   const { config, connection, serverOpen } = useAppState();
   const online = connection.state === 'connected';
   return (
@@ -17,11 +17,11 @@ export function Sidebar({ onNewSession }: { onNewSession: () => void }) {
         <span className="grow ellipsis">{config ? `${config.username}@${displayHost(config.host)}` : ''}</span>
         {online && connection.pingMs != null ? <span className="caption">{connection.pingMs} мс</span> : null}
       </div>
-      <button type="button" className="btn new-session" onClick={onNewSession}>
+      <button type="button" className="btn new-session" onClick={() => onNewSession()}>
         <IconPlus />
         Новая сессия
       </button>
-      <SessionList />
+      <SessionList onNewSession={onNewSession} />
       <div className="sidebar-foot">
         <button type="button" className="btn-ghost server-btn" aria-pressed={serverOpen} onClick={() => setServerOpen(!serverOpen)}>
           <IconPulse />

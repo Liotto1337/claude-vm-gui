@@ -119,6 +119,69 @@ test('карточка меню не меняет размер терминал�
   }
 });
 
+test('отправленное сообщение сразу в ленте (темнее), потом обычное и одно', async () => {
+  const { app, page } = await open();
+  try {
+    await expect(feed(page)).toBeVisible({ timeout: 15_000 });
+    await composer(page).fill('сразу видно');
+    await composer(page).press('Enter');
+    await expect(feed(page).locator('.bubble.is-sending', { hasText: 'сразу видно' })).toBeVisible({ timeout: 400 });
+    await expect.poll(() => feed(page).locator('.bubble', { hasText: 'сразу видно' }).count(), { timeout: 10_000 }).toBe(1);
+    await expect(feed(page).locator('.bubble.is-sending')).toHaveCount(0);
+  } finally {
+    await app.close();
+  }
+});
+
+test('новый ответ «печатается» посимвольно, а история — сразу', async () => {
+  const { app, page } = await open();
+  try {
+    await expect(feed(page).getByText('Сейчас посмотрю.')).toBeVisible({ timeout: 15_000 });
+    await composer(page).fill('long');
+    await composer(page).press('Enter');
+    const answer = feed(page).locator('.md', { hasText: 'Длинный ответ' });
+    await expect(answer).toBeVisible({ timeout: 10_000 });
+    const lengths: number[] = [];
+    for (let i = 0; i < 12; i++) {
+      lengths.push(((await answer.textContent()) ?? '').length);
+      await page.waitForTimeout(100);
+    }
+    await expect(answer).toContainText('Конец ответа.', { timeout: 5000 });
+    const full = ((await answer.textContent()) ?? '').length;
+    expect(lengths.some((n) => n > 0 && n < full)).toBe(true);
+  } finally {
+    await app.close();
+  }
+});
+
+test('пока Claude работает — анимированная звёздочка', async () => {
+  const { app, page } = await open();
+  try {
+    await expect(feed(page)).toBeVisible({ timeout: 15_000 });
+    await composer(page).fill('busy');
+    await composer(page).press('Enter');
+    const star = feed(page).locator('.spinner');
+    await expect(star).toBeVisible({ timeout: 10_000 });
+    const glyphs = new Set<string>();
+    for (let i = 0; i < 8; i++) {
+      glyphs.add((await star.textContent()) ?? '');
+      await page.waitForTimeout(100);
+    }
+    expect(glyphs.size).toBeGreaterThan(1);
+  } finally {
+    await app.close();
+  }
+});
+
+test('кнопка «Завершить сессию» — цвета опасного действия, как в меню', async () => {
+  const { app, page } = await open();
+  try {
+    await expect(page.getByRole('button', { name: 'Завершить сессию' })).toHaveCSS('color', 'rgb(181, 51, 51)', { timeout: 15_000 });
+  } finally {
+    await app.close();
+  }
+});
+
 test('меню: клик по варианту', async () => {
   const { app, page } = await open();
   try {

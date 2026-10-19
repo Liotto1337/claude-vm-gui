@@ -3,6 +3,7 @@ import type {
   ChatItem, ConnectionState, ErrorCode, Hints, HostKeyPrompt, MetricsSample, PreflightEvent, PreflightStep, ScreenState,
   SidebarLayout, SystemInfo, TmuxSession, VmConfig,
 } from '@shared/ipc';
+import { claimPending, type Pending } from './chat-anim';
 import { mergeItems } from './view-mode';
 import { EMPTY, reconcile } from '@shared/layout';
 import { api } from './api';
@@ -38,12 +39,16 @@ export interface AppState {
 
 export interface ChatState {
   items: ChatItem[];
+  /** Отправленные сообщения, которых ещё нет в журнале */
+  pending: Pending[];
+  /** Ответы, которые сейчас «печатаются»: id → время начала (performance.now) */
+  typing: Record<string, number>;
   hasEarlier: boolean;
   screen: ScreenState | null;
   busy: boolean;
   unavailable: string | null;
 }
-const EMPTY_CHAT: ChatState = { items: [], hasEarlier: false, screen: null, busy: false, unavailable: null };
+const EMPTY_CHAT: ChatState = { items: [], pending: [], typing: {}, hasEarlier: false, screen: null, busy: false, unavailable: null };
 
 let state: AppState = {
   view: 'loading',
@@ -158,7 +163,26 @@ export async function init(): Promise<void> {
   api.connection.onState((s) => setState({ connection: s }));
   api.connection.onHostKey((p) => setState({ hostKey: p }));
   api.tmux.onSessions((sessions) => applySessions(sessions));
-  api.chat.onItems((e) => patchChat(e.session, (c) => ({ items: mergeItems(c.items, e), hasEarlier: e.hasEarlier, unavailable: null })));
+  api.chat.onItems((e) =>
+    patchChat(e.session, (c) => {
+      const items = mergeItems(c.items, e);
+      // «Печатаются» только ответы, пришедшие сейчас; история при открытии и «Показать раньше» — сразу
+      const typing = { ...c.typing };
+      if (!e.reset && !e.prepend) {
+        const known = new Set(c.items.map((i) => i.id));
+        for (const i of e.items) if (i.kind === 'assistant' && !known.has(i.id)) typing[i.id] = performance.now();
+      }
+      return { items, typing, pending: claimPending(c.pending, items, Date.now()), hasEarlier: e.hasEarlier, unavailable: null };
+    }),
+  );
+  // Доставленные пузыри без записи журнала уходят сами
+  setInterval(() => {
+    for (const [session, c] of Object.entries(state.chat))
+      if (c.pending.some((p) => p.state === 'sent')) {
+        const next = claimPending(c.pending, c.items, Date.now());
+        if (next.length !== c.pending.length) patchChat(session, () => ({ pending: next }));
+      }
+  }, 5000);
   api.chat.onScreen((e) => patchChat(e.session, () => ({ screen: e.state, busy: e.busy })));
   api.chat.onUnavailable((e) => patchChat(e.session, () => ({ unavailable: e.reason })));
   api.metrics.onSample((s) => {
@@ -244,4 +268,35 @@ export function setViewOverride(v: 'terminal' | null): void {
 export function setServerOpen(open: boolean): void {
   setState({ serverOpen: open });
   api.metrics.setActive(open);
+}
+
+let pendingSeq = 0;
+
+/** Сообщение показано в ленте сразу, до отправки (темнее обычного). */
+export function addPending(session: string, text: string, images: number): string {
+  const id = `pending-${++pendingSeq}`;
+  patchChat(session, (c) => ({
+    pending: [...c.pending, { id, text, images, state: 'sending', seen: new Set(c.items.map((i) => i.id)), at: 0 }],
+  }));
+  return id;
+}
+
+/** Claude Code принял сообщение — пузырь обычного цвета, пока не появится запись журнала. */
+export function markPendingSent(session: string, id: string): void {
+  patchChat(session, (c) => ({
+    pending: claimPending(c.pending.map((p) => (p.id === id ? { ...p, state: 'sent' as const, at: Date.now() } : p)), c.items, Date.now()),
+  }));
+}
+
+export function dropPending(session: string, id: string): void {
+  patchChat(session, (c) => ({ pending: c.pending.filter((p) => p.id !== id) }));
+}
+
+/** «Печать» ответа закончилась — дальше обычная отрисовка. */
+export function typingDone(session: string, id: string): void {
+  const c = state.chat[session];
+  if (!c || !(id in c.typing)) return;
+  const typing = { ...c.typing };
+  delete typing[id];
+  patchChat(session, () => ({ typing }));
 }

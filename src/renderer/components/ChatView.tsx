@@ -1,7 +1,9 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import { api } from '../api';
-import { useAppState } from '../state';
+import { typingDone, useAppState } from '../state';
 import { ChatItemView } from './ChatItemView';
+import { IconImage } from './icons';
+import { Spinner } from './Spinner';
 
 const NEAR_BOTTOM = 48;
 
@@ -10,6 +12,11 @@ export function ChatView({ session }: { session: string }) {
   const chat = useAppState().chat[session];
   const items = chat?.items ?? [];
   const status = chat?.screen?.kind === 'prompt' ? chat.screen.status : null;
+  const working = status !== null || (!!chat?.busy && chat.screen?.kind !== 'menu');
+  const pending = chat?.pending ?? [];
+  const typing = chat?.typing ?? {};
+  // Пока ответ «печатается», лента следит за низом
+  const [tick, setTick] = useState(0);
   const box = useRef<HTMLElement>(null);
   const atBottom = useRef(true);
   const restore = useRef<number | null>(null);
@@ -27,7 +34,20 @@ export function ChatView({ session }: { session: string }) {
     }
     if (atBottom.current) el.scrollTop = el.scrollHeight;
     else setBehind(true);
-  }, [items, status]);
+  }, [items, status, pending, tick]);
+
+  // Содержимое растёт само («печать» ответа) — держим низ, если пользователь внизу
+  const inner = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const el = box.current;
+    const content = inner.current;
+    if (!el || !content) return;
+    const ro = new ResizeObserver(() => {
+      if (atBottom.current) el.scrollTop = el.scrollHeight;
+    });
+    ro.observe(content);
+    return () => ro.disconnect();
+  }, []);
 
   const onScroll = () => {
     const el = box.current;
@@ -46,19 +66,38 @@ export function ChatView({ session }: { session: string }) {
 
   return (
     <section aria-label="Переписка" className="chat" ref={box} onScroll={onScroll}>
-      <div className="chat-inner">
+      <div className="chat-inner" ref={inner}>
         {chat?.hasEarlier ? (
           <button type="button" className="btn btn-sm chat-earlier" disabled={loading} onClick={() => void loadEarlier()}>
             Показать раньше
           </button>
         ) : null}
-        {items.length === 0 && !status ? <p className="caption chat-empty">Переписка пока пустая</p> : null}
+        {items.length === 0 && pending.length === 0 && !working ? <p className="caption chat-empty">Переписка пока пустая</p> : null}
         {items.map((i) => (
-          <ChatItemView key={i.id} item={i} />
+          <ChatItemView
+            key={i.id}
+            item={i}
+            typingSince={typing[i.id]}
+            onTyped={typing[i.id] !== undefined ? () => {
+              typingDone(session, i.id);
+              setTick((t) => t + 1);
+            } : undefined}
+          />
         ))}
-        {status ? (
+        {pending.map((p) => (
+          <div key={p.id} className={p.state === 'sending' ? 'bubble is-sending' : 'bubble'}>
+            {Array.from({ length: p.images }, (_, k) => (
+              <span key={k} className="img-chip">
+                <IconImage />
+                Картинка
+              </span>
+            ))}
+            {p.text ? <span className="bubble-text">{p.text}</span> : null}
+          </div>
+        ))}
+        {working ? (
           <div className="chat-status" role="status">
-            <span aria-hidden="true">✻</span> {status}
+            <Spinner /> {status ?? 'Claude работает…'}
           </div>
         ) : null}
       </div>
