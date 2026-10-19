@@ -1,7 +1,8 @@
 import { useSyncExternalStore } from 'react';
 import type {
-  ConnectionState, ErrorCode, Hints, HostKeyPrompt, PreflightEvent, PreflightStep, TmuxSession, VmConfig,
+  ConnectionState, ErrorCode, Hints, HostKeyPrompt, PreflightEvent, PreflightStep, SidebarLayout, TmuxSession, VmConfig,
 } from '@shared/ipc';
+import { EMPTY, reconcile } from '@shared/layout';
 import { api } from './api';
 
 export type View = 'loading' | 'settings' | 'connect' | 'main';
@@ -20,6 +21,8 @@ export interface AppState {
   theme: 'light' | 'dark';
   /** Последний выбор модели и effort в каждой сессии (из этого приложения) */
   choices: Record<string, { model?: string; modelLabel?: string; effort?: string }>;
+  /** Порядок, закрепление и группы сессий в сайдбаре */
+  layout: SidebarLayout;
 }
 
 let state: AppState = {
@@ -35,6 +38,7 @@ let state: AppState = {
   systemTheme: 'light',
   theme: 'light',
   choices: {},
+  layout: EMPTY,
 };
 
 const listeners = new Set<() => void>();
@@ -72,10 +76,12 @@ export async function connect(): Promise<void> {
   setState({ view: 'connect', preflight: {}, connectError: null, hostKey: null });
   const r = await api.connection.connect();
   if (r.ok) {
-    const list = await api.tmux.list();
+    const [list, saved] = await Promise.all([api.tmux.list(), api.layout.get()]);
     const sessions = list.ok ? list.data : [];
     const last = state.config?.lastSession;
-    setState({ view: 'main', sessions, current: sessions.some((s) => s.name === last) ? (last ?? null) : null });
+    setState({ layout: saved });
+    applySessions(sessions);
+    setState({ view: 'main', current: sessions.some((s) => s.name === last) ? (last ?? null) : null });
   } else {
     setState({ connectError: r.error, hostKey: null });
   }
@@ -110,14 +116,30 @@ export async function init(): Promise<void> {
   api.connection.onPreflight((e) => setState({ preflight: { ...state.preflight, [e.step]: e } }));
   api.connection.onState((s) => setState({ connection: s }));
   api.connection.onHostKey((p) => setState({ hostKey: p }));
-  api.tmux.onSessions((sessions) => setState({ sessions }));
+  api.tmux.onSessions((sessions) => applySessions(sessions));
   setState({ config, systemTheme, view: config ? 'connect' : 'settings' });
   if (config) void connect();
 }
 
 export async function refreshSessions(): Promise<void> {
   const r = await api.tmux.list();
-  if (r.ok) setState({ sessions: r.data });
+  if (r.ok) applySessions(r.data);
+}
+
+/** Новый список tmux: раскладка сайдбара сверяется (новые сессии — первыми среди незакреплённых). */
+function applySessions(sessions: TmuxSession[]): void {
+  const layout = reconcile(state.layout, sessions.map((s) => s.name));
+  const changed = JSON.stringify(layout) !== JSON.stringify(state.layout);
+  setState({ sessions, layout });
+  if (changed) void api.layout.save(layout);
+}
+
+/** Изменить раскладку сайдбара и сохранить её. */
+export function updateLayout(fn: (l: SidebarLayout) => SidebarLayout): void {
+  const layout = fn(state.layout);
+  if (layout === state.layout) return;
+  setState({ layout });
+  void api.layout.save(layout);
 }
 
 export function openSession(name: string | null): void {

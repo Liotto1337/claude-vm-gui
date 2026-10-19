@@ -135,8 +135,39 @@
 .conn-chip { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; background: var(--panel); border: 0.5px solid var(--border); font-size: 13px; }
 .new-session { display: flex; align-items: center; gap: 8px; min-height: 44px; background: var(--panel); }
 .section-label { padding: 0 10px; }
-.session-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; overflow-y: auto; flex: 1; min-height: 0; }
-.session-item { width: 100%; display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border-radius: 8px; border: none; background: transparent; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+/* Список сессий делится на страницы: высоты строк совпадают с ROW_HEIGHTS в SessionList.tsx */
+.session-box { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.session-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; overflow: hidden; flex: 1; min-height: 0; }
+.session-list > li { flex: none; position: relative; box-sizing: border-box; }
+.row-session { height: 52px; padding: 1px 0; }
+.row-session.in-group { padding-left: 14px; }
+.row-session.in-group .session-item { border-left: 0.5px solid var(--border); border-radius: 0 8px 8px 0; }
+.row-group { height: 34px; padding: 1px 0; }
+.row-section { height: 28px; display: flex; align-items: flex-end; padding: 0 10px 6px; }
+.row-divider { height: 17px; display: flex; align-items: center; padding: 0 10px; }
+.row-divider::after { content: ''; flex: 1; height: 0.5px; background: var(--border); }
+.group-header { width: 100%; height: 100%; display: flex; align-items: center; gap: 6px; padding: 0 10px; border: none; border-radius: 8px; background: transparent; color: var(--text-2); font: inherit; font-size: 13px; font-weight: 600; text-align: left; cursor: pointer; }
+.group-header:hover { background: var(--hover); color: var(--text); }
+.group-count { font-weight: 400; color: var(--text-3); }
+.pin { margin-left: auto; display: inline-flex; color: var(--text-3); }
+.group-header .pin { margin-left: auto; }
+.drop-before::before, .drop-after::after { content: ''; position: absolute; left: 10px; right: 10px; height: 2px; border-radius: 1px; background: var(--accent); z-index: 1; }
+.drop-before::before { top: -1px; }
+.drop-after::after { bottom: -1px; }
+.drop-into .group-header { background: var(--hover); color: var(--text); box-shadow: inset 0 0 0 1px var(--accent); }
+.pager { flex: none; height: 40px; display: flex; align-items: center; justify-content: center; gap: 6px; }
+.icon-btn { width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; border: none; background: transparent; color: var(--text-2); cursor: pointer; }
+.icon-btn:hover:not(:disabled) { background: var(--hover); color: var(--text); }
+.icon-btn:disabled { color: var(--text-3); opacity: 0.5; cursor: default; }
+.ctx-menu { position: fixed; z-index: 30; width: 236px; }
+.ctx-sub { position: absolute; left: calc(100% + 4px); top: 0; width: 200px; }
+.ctx-item { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 36px; padding: 0 10px; border: none; border-radius: 8px; background: transparent; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.ctx-item:hover:not(:disabled), .ctx-item:focus-visible, .ctx-item[aria-expanded='true'] { background: var(--hover); outline: none; }
+.ctx-item:disabled { color: var(--text-3); cursor: default; }
+.ctx-danger { color: var(--danger); }
+.ctx-icon { width: 14px; flex: none; }
+.ctx-sep { height: 0.5px; background: var(--border); margin: 4px 6px; }
+.session-item { width: 100%; height: 100%; box-sizing: border-box; overflow: hidden; display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border-radius: 8px; border: none; background: transparent; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
 .session-item:hover { background: var(--hover); }
 .session-item[aria-current='page'] { background: var(--hover); }
 .session-item[aria-current='page'] .session-name { font-weight: 600; }

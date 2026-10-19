@@ -65,3 +65,29 @@ export const IconImage = () => (
     <path d="M21 17l-5-5-9 8" />
   </svg>
 );
+export const IconPin = ({ label, size = 13 }: { label?: string; size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" {...base} strokeWidth="2" role={label ? 'img' : undefined} aria-label={label} aria-hidden={label ? undefined : true}>
+    <path d="M9 4h6l-1 6 3 3v2H7v-2l3-3z" />
+    <path d="M12 15v5" />
+  </svg>
+);
+export const IconChevronRight = ({ size = 12 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" {...base} strokeWidth="2.2" aria-hidden="true">
+    <path d="M9 6l6 6-6 6" />
+  </svg>
+);
+export const IconChevronLeft = ({ size = 14 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" {...base} strokeWidth="2.2" aria-hidden="true">
+    <path d="M15 6l-6 6 6 6" />
+  </svg>
+);
+export const IconFolder = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" {...base} strokeWidth="2" aria-hidden="true">
+    <path d="M3 7h6l2 2h10v10H3z" />
+  </svg>
+);
+export const IconPulse = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" {...base} strokeWidth="1.8" aria-hidden="true">
+    <path d="M3 12h4l3-8 4 16 3-8h4" />
+  </svg>
+);
