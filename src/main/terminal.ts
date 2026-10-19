@@ -1,9 +1,9 @@
 import { EventEmitter } from 'node:events';
 import { StringDecoder } from 'node:string_decoder';
 import type { ClientChannel } from 'ssh2';
-import { fail, ok, type ExitReason, type Result } from '@shared/ipc';
+import { fail, ok, type ExitReason, type MenuKey, type Result } from '@shared/ipc';
 import { dialogOpen } from '@shared/dialog';
-import { bracketedPaste, slashCommand } from '@shared/paste';
+import { bracketedPaste, keyBytes, slashCommand } from '@shared/paste';
 import { validateSessionName } from '@shared/quote';
 import { inputText } from '@shared/screen-parse';
 import type { SshConnection } from './ssh';
@@ -114,9 +114,9 @@ export class TerminalService extends EventEmitter {
   /**
    * Можно ли писать в терминал: на переднем плане claude (а не оболочка, где текст выполнился бы)
    * и не открыто меню Claude Code (там Enter выбрал бы пункт по умолчанию, например «разрешить»).
-   * Если проверить не удалось — не пишем.
+   * Если проверить не удалось — не пишем. `allowMenu` — для клавиш карточки меню: им открытое меню не мешает.
    */
-  private async checkWritable(): Promise<Result<void>> {
+  private async checkWritable(allowMenu = false): Promise<Result<void>> {
     const session = this.session;
     if (!session) return fail('NO_SESSION', 'Сессия не открыта');
     const sep = '__cvg_sep__';
@@ -138,7 +138,22 @@ export class TerminalService extends EventEmitter {
     // Claude Code, поставленный через npm, виден как node — смотрим на аргументы процесса
     const isClaude = command === 'claude' || (command === 'node' && /claude/i.test(children));
     if (!isClaude && !fake) return fail('NO_CLAUDE', NO_CLAUDE_TEXT);
-    if (dialogOpen(screen)) return fail('PROMPT_OPEN', PROMPT_OPEN_TEXT);
+    if (!allowMenu && dialogOpen(screen)) return fail('PROMPT_OPEN', PROMPT_OPEN_TEXT);
+    return ok(undefined);
+  }
+
+  /** Клавиша из белого списка (карточка меню, «Остановить») — только если на переднем плане claude. */
+  async key(k: MenuKey): Promise<Result<void>> {
+    let bytes: string;
+    try {
+      bytes = keyBytes(k);
+    } catch (e) {
+      return fail('BAD_NAME', (e as Error).message);
+    }
+    if (!this.stream) return fail('NO_SESSION', 'Сессия не открыта');
+    const check = await this.checkWritable(true);
+    if (!check.ok) return check;
+    this.stream?.write(bytes);
     return ok(undefined);
   }
 
@@ -164,17 +179,21 @@ export class TerminalService extends EventEmitter {
     }
   }
 
-  private async field(name: string): Promise<string | null> {
+  /** Текст поля ввода; null — поля на экране нет; undefined — снимок экрана не получен. */
+  private async field(name: string): Promise<string | null | undefined> {
     const screen = await this.probe(name);
-    return screen === null ? null : inputText(screen);
+    return screen === null ? undefined : inputText(screen);
   }
 
-  /** Ждёт, пока поле ввода изменится (сообщение принято) или пройдёт ms. */
+  /**
+   * Ждёт, пока сообщение принято: поле опустело, изменилось или пропало совсем
+   * (Claude Code сразу показал меню — например, запрос разрешения). Иначе false через ms.
+   */
   private async accepted(name: string, before: string, ms: number): Promise<boolean> {
     for (const t = Date.now(); Date.now() - t < ms; ) {
       await sleep(this.timings.pollMs);
       const now = await this.field(name);
-      if (now !== null && (now === '' || now !== before)) return true;
+      if (now !== undefined && (now === null || now === '' || now !== before)) return true;
     }
     return false;
   }
@@ -196,7 +215,8 @@ export class TerminalService extends EventEmitter {
     let recognized = false;
     for (const start = Date.now(); Date.now() - start < t.settleMaxMs; ) {
       await sleep(t.pollMs);
-      const now = await this.field(name);
+      const found = await this.field(name);
+      const now = found ?? null;
       if (now !== null) recognized = true;
       if (now && now === prev) {
         ready = now;

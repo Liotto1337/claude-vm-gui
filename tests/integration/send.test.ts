@@ -70,6 +70,16 @@ describe.skipIf(!hasTestKey)('отправка одним Enter', () => {
     term.close();
   });
 
+  it('после Enter появилось меню — повтора нет, меню не тронуто', async () => {
+    const { name, term } = await start('send-menu');
+    expect((await term.send('menu', [])).ok).toBe(true);
+    await sleep(300);
+    const s = await screenOf(name);
+    expect(s).toContain('Enter to confirm');
+    expect(s).not.toContain('выбран');
+    term.close();
+  });
+
   it('Enter не принят — SEND_NOT_CONFIRMED', async () => {
     const { term } = await start('send-stuck', '', { probe: async () => FIELD_WITH_TEXT, timings: FAST });
     const r = await term.send('что-то', []);

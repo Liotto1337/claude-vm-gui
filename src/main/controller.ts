@@ -1,7 +1,10 @@
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { fail, ok, type HostKeyPrompt, type ImageExt, type Result } from '@shared/ipc';
+import { fail, ok, type HostKeyPrompt, type ImageExt, type MenuKey, type Result } from '@shared/ipc';
+import { transcriptPath } from '@shared/claude-session';
 import { HintsService } from './hints';
+import { SessionWatcher } from './session-watch';
+import { TranscriptService } from './transcript';
 import type { IpcHub } from './ipc';
 import { SshConnection } from './ssh';
 import { TerminalService } from './terminal';
@@ -20,6 +23,9 @@ interface Services {
   term: TerminalService;
   hints: HintsService;
   upload: UploadService;
+  watch: SessionWatcher;
+  transcript: TranscriptService;
+  claudeDir: string;
   stopPolling: () => void;
 }
 
@@ -44,18 +50,30 @@ export class AppController {
     h.handle('tmux:create', (name: string, dir: string, start: boolean) => this.need((s) => s.tmux.create(name, dir, start)));
     h.handle('tmux:kill', (name: string) =>
       this.need(async (s) => {
-        if (s.term.current === name) s.term.close();
+        if (s.term.current === name) {
+          s.term.close();
+          this.stopChat(s);
+        }
         return s.tmux.kill(name);
       }),
     );
     h.handle('tmux:startClaude', (name: string) => this.need((s) => s.tmux.startClaude(name)));
 
-    h.handle('term:open', (name: string, cols: number, rows: number) => this.need((s) => s.term.open(name, cols, rows)));
+    h.handle('term:open', (name: string, cols: number, rows: number) =>
+      this.need(async (s) => {
+        const r = await s.term.open(name, cols, rows);
+        if (r.ok) this.startChat(s, name);
+        return r;
+      }),
+    );
     h.listen('term:write', (data: string) => this.s?.term.write(data));
     h.listen('term:resize', (cols: number, rows: number) => this.s?.term.resize(cols, rows));
     h.handle('term:send', (text: string, paths: string[]) => this.need((s) => s.term.send(text, paths)));
     h.handle('term:setModel', (v: string) => this.need((s) => s.term.setModel(v)));
     h.handle('term:setEffort', (v: string) => this.need((s) => s.term.setEffort(v)));
+
+    h.handle('chat:key', (k: MenuKey) => this.need((s) => s.term.key(k)));
+    h.handle('chat:loadEarlier', () => this.need((s) => s.transcript.loadEarlier()));
 
     h.handle('hints:get', (cwd: string) => this.need((s) => s.hints.get(cwd)));
     h.handle('hints:files', (cwd: string) => this.need((s) => s.hints.files(cwd)));
@@ -70,6 +88,32 @@ export class AppController {
     } catch (e) {
       return fail('NOT_CONNECTED', (e as Error).message);
     }
+  }
+
+  /** Лента открытой сессии: экран (меню, статус) и журнал Claude Code. */
+  private startChat(s: Services, name: string): void {
+    s.transcript.stop();
+    s.watch.start(name);
+  }
+
+  private stopChat(s: Services): void {
+    s.watch.stop();
+    s.transcript.stop();
+  }
+
+  private wireChat(watch: SessionWatcher, transcript: TranscriptService, claudeDir: string): void {
+    watch.on('screen', (e) => this.hub.emit('chat:screen', { session: watch.current, ...e }));
+    watch.on('claude', (info: { sessionId: string; cwd: string } | null) => {
+      let path: string | null = null;
+      try {
+        path = info ? transcriptPath(claudeDir, info.cwd, info.sessionId) : null;
+      } catch {
+        path = null;
+      }
+      if (path !== transcript.following) void transcript.follow(path);
+    });
+    transcript.on('items', (e) => this.hub.emit('chat:items', { session: watch.current, ...e }));
+    transcript.on('unavailable', (reason: string) => this.hub.emit('chat:unavailable', { session: watch.current, reason }));
   }
 
   private askHostKey(p: HostKeyPrompt): Promise<boolean> {
@@ -125,12 +169,25 @@ export class AppController {
 
     const term = new TerminalService(conn, tmux);
     term.on('data', (d: string) => this.hub.emit('term:data', d));
-    term.on('exit', (reason) => this.hub.emit('term:exit', reason));
+    term.on('exit', (reason) => {
+      if (reason !== 'connection-lost' && this.s) this.stopChat(this.s);
+      this.hub.emit('term:exit', reason);
+    });
+    // Каталог Claude Code на ВМ (журналы и sessions/*.json); CVG_CLAUDE_DIR — для тестов
+    const home = (await conn.exec('printf %s "$HOME"').catch(() => ({ stdout: '/root' }))).stdout.trim() || '/root';
+    const claudeDir = process.env.CVG_CLAUDE_DIR ?? `${home}/.claude`;
+    const watch = new SessionWatcher(conn, { claudeDir });
+    const transcript = new TranscriptService(conn);
+    this.wireChat(watch, transcript, claudeDir);
+    // После переподключения терминал снова в сессии — перезапускаем ленту
+    term.on('reattached', () => {
+      if (this.s && term.current) this.startChat(this.s, term.current);
+    });
     const upload = new UploadService(conn);
     upload.on('progress', (p) => this.hub.emit('upload:progress', p));
     const hints = new HintsService(conn);
     const stopPolling = tmux.startPolling((sessions) => this.hub.emit('tmux:sessions', sessions));
-    this.s = { conn, tmux, term, hints, upload, stopPolling };
+    this.s = { conn, tmux, term, hints, upload, watch, transcript, claudeDir, stopPolling };
     void upload.cleanup();
     return ok(undefined);
   }
@@ -147,6 +204,7 @@ export class AppController {
     this.s = null;
     if (!s) return;
     s.stopPolling();
+    this.stopChat(s);
     s.term.close();
     s.conn.close();
   }

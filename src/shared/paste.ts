@@ -1,3 +1,5 @@
+import type { MenuKey } from './ipc';
+
 const PASTE_START = '\x1b[200~';
 const PASTE_END = '\x1b[201~';
 
@@ -18,4 +20,16 @@ const ARG = /^[A-Za-z0-9._[\]-]+$/;
 export function slashCommand(cmd: 'model' | 'effort', arg: string): string {
   if (!ARG.test(arg)) throw new Error(`Недопустимое значение: ${arg}`);
   return `/${cmd} ${arg}\r`;
+}
+
+const KEYS: Record<string, string> = {
+  up: '\x1b[A', down: '\x1b[B', right: '\x1b[C', left: '\x1b[D',
+  enter: '\r', esc: '\x1b', tab: '\t', 'shift-tab': '\x1b[Z',
+};
+
+/** Байты клавиши для терминала. Только белый список: стрелки, Enter, Esc, Tab, Shift+Tab, цифры 1–9. */
+export function keyBytes(k: MenuKey): string {
+  if (Object.hasOwn(KEYS, k)) return KEYS[k];
+  if (/^[1-9]$/.test(k)) return k;
+  throw new Error(`Недопустимая клавиша: ${String(k)}`);
 }

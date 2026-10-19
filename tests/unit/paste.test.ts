@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bracketedPaste, slashCommand } from '../../src/shared/paste';
+import { bracketedPaste, keyBytes, slashCommand } from '../../src/shared/paste';
 
 describe('bracketedPaste', () => {
   it('оборачивает текст, вырезает ESC, добавляет пути картинок и Enter', () => {
@@ -19,4 +19,22 @@ describe('slashCommand', () => {
   it('полное имя модели с [1m]', () => expect(slashCommand('model', 'claude-opus-5-5[1m]')).toBe('/model claude-opus-5-5[1m]\r'));
   it('effort', () => expect(slashCommand('effort', 'low')).toBe('/effort low\r'));
   it('инъекция — ошибка', () => expect(() => slashCommand('effort', 'x; rm')).toThrow());
+});
+
+describe('keyBytes', () => {
+  it('стрелки', () => {
+    expect(keyBytes('up')).toBe('\x1b[A');
+    expect(keyBytes('down')).toBe('\x1b[B');
+    expect(keyBytes('right')).toBe('\x1b[C');
+    expect(keyBytes('left')).toBe('\x1b[D');
+  });
+  it('Enter, Esc, Tab, Shift+Tab', () => {
+    expect(keyBytes('enter')).toBe('\r');
+    expect(keyBytes('esc')).toBe('\x1b');
+    expect(keyBytes('tab')).toBe('\t');
+    expect(keyBytes('shift-tab')).toBe('\x1b[Z');
+  });
+  it('цифра', () => expect(keyBytes('7')).toBe('7'));
+  it('неизвестная клавиша — ошибка', () => expect(() => keyBytes('rm -rf' as never)).toThrow());
+  it('0 не из списка', () => expect(() => keyBytes('0' as never)).toThrow());
 });

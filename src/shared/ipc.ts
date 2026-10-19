@@ -161,6 +161,13 @@ export interface Api {
   };
   clipboard: { read(): Promise<string>; write(text: string): void };
   layout: { get(): Promise<SidebarLayout>; save(l: SidebarLayout): Promise<Result<void>> };
+  chat: {
+    onItems(cb: (e: ChatEvent) => void): Unsubscribe;
+    onScreen(cb: (e: ScreenEvent) => void): Unsubscribe;
+    onUnavailable(cb: (e: { session: string; reason: string }) => void): Unsubscribe;
+    loadEarlier(): Promise<Result<void>>;
+    key(k: MenuKey): Promise<Result<void>>;
+  };
   platform: {
     theme(): Promise<'light' | 'dark'>;
     onThemeChange(cb: (t: 'light' | 'dark') => void): Unsubscribe;
