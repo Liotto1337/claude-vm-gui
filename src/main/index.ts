@@ -55,7 +55,8 @@ app.whenReady().then(() => {
     controller.disconnect();
   });
   if (process.env.CVG_TEST_HOOKS === '1') {
-    (globalThis as unknown as { __cvg: object }).__cvg = { dropConnection: () => controller.simulateDrop() };
+    const g = globalThis as unknown as { __cvg?: object };
+    g.__cvg = Object.assign(g.__cvg ?? {}, { dropConnection: () => controller.simulateDrop() });
     // E2E на Linux без хранилища ключей: шифрование «для вида», чтобы проверить сохранение пароля
     if (process.platform === 'linux') safeStorage.setUsePlainTextEncryption(true);
   }

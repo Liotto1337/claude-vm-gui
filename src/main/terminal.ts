@@ -122,7 +122,8 @@ export class TerminalService extends EventEmitter {
     const sep = '__cvg_sep__';
     const cmd =
       `${tmuxCmd()} display-message -p -t ${exactPane(session)} '#{pane_current_command}\t#{pane_pid}' && ` +
-      `echo ${sep} && ps -o args= --ppid "$(${tmuxCmd()} display-message -p -t ${exactPane(session)} '#{pane_pid}')"; ` +
+      // Процесс панели и его дети: claude бывает и самой командой панели, и потомком оболочки
+      `echo ${sep} && PP=$(${tmuxCmd()} display-message -p -t ${exactPane(session)} '#{pane_pid}') && ps -o args= -p "$PP" --ppid "$PP"; ` +
       `echo ${sep}; ${tmuxCmd()} capture-pane -p -t ${exactPane(session)}`;
     let out: string;
     try {

@@ -70,7 +70,7 @@ export class SessionWatcher extends EventEmitter {
     const dir = shellQuote(this.opts.claudeDir);
     const cmd =
       `P=$(${tmuxCmd()} display-message -p -t ${pane} '#{pane_id}\t#{pane_pid}\t#{pane_current_command}') || exit 3; ` +
-      `echo "$P"; echo ${SEP}; ps -o pid=,args= --ppid "$(printf '%s' "$P" | cut -f2)"; echo ${SEP}; ` +
+      `echo "$P"; echo ${SEP}; PP=$(printf '%s' "$P" | cut -f2); ps -o pid=,args= -p "$PP" --ppid "$PP"; echo ${SEP}; ` +
       `${tmuxCmd()} capture-pane -e -p -t ${pane}` +
       (withSessions ? `; echo ${SEP}; for f in ${dir}/sessions/*.json; do [ -f "$f" ] && cat "$f"; echo; done` : '');
     let out: string | null = null;

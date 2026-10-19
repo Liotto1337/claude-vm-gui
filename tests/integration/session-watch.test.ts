@@ -83,6 +83,22 @@ describe.skipIf(!hasTestKey)('наблюдение за сессией', () => {
     w.stop();
   });
 
+  it('claude — сам процесс панели (без оболочки): тоже prompt', async () => {
+    const name = testSessionName('sw-direct');
+    created.push(name);
+    await conn.exec(`tmux new-session -d -s ${name} -x 100 -y 30 'CVG_CLAUDE_DIR=${claudeDir} node ${FAKE}'`);
+    const w = new SessionWatcher(conn, { claudeDir, intervalMs: 200 });
+    const states: string[] = [];
+    w.on('screen', (e) => states.push(e.state.kind));
+    w.start(name);
+    await expect.poll(() => states[states.length - 1], { timeout: 8000 }).toBe('prompt');
+    const term = new TerminalService(conn, tmux);
+    expect((await term.open(name, 100, 30)).ok).toBe(true);
+    expect((await term.key('esc')).ok).toBe(true);
+    term.close();
+    w.stop();
+  });
+
   it('после stop событий нет', async () => {
     const { w, screens } = await watch('sw-stop', true);
     await expect.poll(() => screens.length, { timeout: 8000 }).toBeGreaterThan(0);

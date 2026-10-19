@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import type { TmuxSession } from '@shared/ipc';
-import { killSession, shortPath } from '../state';
+import { killSession, setViewOverride, shortPath } from '../state';
 import { ConfirmDialog } from './ConfirmDialog';
 import { IconClose } from './icons';
 
-export function SessionHeader({ session }: { session: TmuxSession }) {
+/** mode — что сейчас показано; переключатель «Лента | Терминал» — только когда запущен claude. */
+export function SessionHeader({ session, mode = 'terminal' }: { session: TmuxSession; mode?: 'chat' | 'terminal' }) {
   const [confirm, setConfirm] = useState(false);
   const what = session.claudeRunning ? 'в сессии запущен claude' : `в сессии ${session.command || 'shell'}`;
   return (
@@ -15,6 +16,12 @@ export function SessionHeader({ session }: { session: TmuxSession }) {
           {shortPath(session.cwd)} · {what}
         </span>
       </div>
+      {session.claudeRunning ? (
+        <div role="group" aria-label="Вид" className="seg">
+          <button type="button" aria-pressed={mode === 'chat'} onClick={() => setViewOverride(null)}>Лента</button>
+          <button type="button" aria-pressed={mode === 'terminal'} onClick={() => setViewOverride('terminal')}>Терминал</button>
+        </div>
+      ) : null}
       <button type="button" className="btn btn-sm" onClick={() => setConfirm(true)}>
         <IconClose />
         Завершить сессию

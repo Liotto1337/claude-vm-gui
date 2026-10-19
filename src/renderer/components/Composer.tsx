@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent } from 'react';
 import { detectTrigger, filterHints, type Trigger } from '@shared/hints';
-import type { HintCommand, Hints, ImageExt, ModelInfo, TmuxSession } from '@shared/ipc';
+import type { HintCommand, Hints, ImageExt, ModelInfo, ParsedMenu, TmuxSession } from '@shared/ipc';
 import { api } from '../api';
 import { refreshSessions, rememberChoice, useAppState } from '../state';
 import { AttachmentChip, type Attachment } from './AttachmentChip';
 import { ChoiceMenu } from './ChoiceMenu';
 import { HintPopup, type HintItem } from './HintPopup';
 import { IconArrowUp, IconClip } from './icons';
+import { MenuCard } from './MenuCard';
 
 const MIME_EXT: Record<string, ImageExt> = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp' };
 const MAX_BYTES = 20 * 1024 * 1024;
@@ -17,7 +18,12 @@ const FALLBACK_MODELS: ModelInfo[] = [
 ];
 const FALLBACK_EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'];
 
-export function Composer({ session }: { session: TmuxSession }) {
+/**
+ * Поле ввода. menu — открытое меню Claude Code (карточка над полем, поле неактивно);
+ * working — claude работает (кнопка «Остановить»), chatMode — показана лента, а не терминал.
+ */
+export function Composer({ session, menu = null, working = false, chatMode = false }: { session: TmuxSession; menu?: ParsedMenu | null; working?: boolean; chatMode?: boolean }) {
+  const menuOpen = menu !== null;
   const { choices } = useAppState();
   const choice = choices[session.name] ?? {};
   const [text, setText] = useState('');
@@ -103,7 +109,7 @@ export function Composer({ session }: { session: TmuxSession }) {
   const uploading = attachments.some((a) => a.status === 'uploading');
   const ready = attachments.filter((a) => a.status === 'done');
   const canSend =
-    session.claudeRunning && !busy && !uploading && !attachments.some((a) => a.status === 'error') && (text.trim() !== '' || ready.length > 0);
+    session.claudeRunning && !menuOpen && !busy && !uploading && !attachments.some((a) => a.status === 'error') && (text.trim() !== '' || ready.length > 0);
 
   const send = async () => {
     if (!canSend || sending.current) return;
@@ -200,6 +206,7 @@ export function Composer({ session }: { session: TmuxSession }) {
           </button>
         </div>
       ) : null}
+      {menu ? <MenuCard menu={menu} /> : null}
       <div className="composer-anchor">
         <HintPopup items={items} active={active} onPick={pick} />
         <div className="composer">
@@ -224,7 +231,8 @@ export function Composer({ session }: { session: TmuxSession }) {
             ref={box}
             rows={2}
             value={text}
-            placeholder="Напишите сообщение…"
+            disabled={menuOpen}
+            placeholder={menuOpen ? 'Сначала ответьте на вопрос выше' : 'Напишите сообщение…'}
             onChange={(e) => {
               setText(e.target.value);
               setCaret(e.target.selectionStart);
@@ -276,6 +284,9 @@ export function Composer({ session }: { session: TmuxSession }) {
                 })
               }
             />
+            {chatMode && working && !menuOpen ? (
+              <button type="button" className="btn btn-sm" onClick={() => void api.chat.key('esc')}>Остановить · Esc</button>
+            ) : null}
             <button type="button" className="send-btn" aria-label="Отправить" disabled={!canSend} onClick={() => void send()}>
               <IconArrowUp />
             </button>

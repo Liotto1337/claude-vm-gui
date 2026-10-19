@@ -161,6 +161,7 @@ export interface Api {
   };
   clipboard: { read(): Promise<string>; write(text: string): void };
   layout: { get(): Promise<SidebarLayout>; save(l: SidebarLayout): Promise<Result<void>> };
+  links: { open(url: string): void };
   chat: {
     onItems(cb: (e: ChatEvent) => void): Unsubscribe;
     onScreen(cb: (e: ScreenEvent) => void): Unsubscribe;

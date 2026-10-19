@@ -1,7 +1,9 @@
 import { useSyncExternalStore } from 'react';
 import type {
-  ConnectionState, ErrorCode, Hints, HostKeyPrompt, PreflightEvent, PreflightStep, SidebarLayout, TmuxSession, VmConfig,
+  ChatItem, ConnectionState, ErrorCode, Hints, HostKeyPrompt, PreflightEvent, PreflightStep, ScreenState, SidebarLayout,
+  TmuxSession, VmConfig,
 } from '@shared/ipc';
+import { mergeItems } from './view-mode';
 import { EMPTY, reconcile } from '@shared/layout';
 import { api } from './api';
 
@@ -23,7 +25,20 @@ export interface AppState {
   choices: Record<string, { model?: string; modelLabel?: string; effort?: string }>;
   /** Порядок, закрепление и группы сессий в сайдбаре */
   layout: SidebarLayout;
+  /** Лента каждой сессии: журнал, экран, занятость */
+  chat: Record<string, ChatState>;
+  /** Пользователь выбрал «Терминал» для открытой сессии */
+  viewOverride: 'terminal' | null;
 }
+
+export interface ChatState {
+  items: ChatItem[];
+  hasEarlier: boolean;
+  screen: ScreenState | null;
+  busy: boolean;
+  unavailable: string | null;
+}
+const EMPTY_CHAT: ChatState = { items: [], hasEarlier: false, screen: null, busy: false, unavailable: null };
 
 let state: AppState = {
   view: 'loading',
@@ -39,7 +54,15 @@ let state: AppState = {
   theme: 'light',
   choices: {},
   layout: EMPTY,
+  chat: {},
+  viewOverride: null,
 };
+
+function patchChat(session: string | null | undefined, patch: (c: ChatState) => Partial<ChatState>): void {
+  if (!session) return;
+  const prev = state.chat[session] ?? EMPTY_CHAT;
+  setState({ chat: { ...state.chat, [session]: { ...prev, ...patch(prev) } } });
+}
 
 const listeners = new Set<() => void>();
 
@@ -117,6 +140,9 @@ export async function init(): Promise<void> {
   api.connection.onState((s) => setState({ connection: s }));
   api.connection.onHostKey((p) => setState({ hostKey: p }));
   api.tmux.onSessions((sessions) => applySessions(sessions));
+  api.chat.onItems((e) => patchChat(e.session, (c) => ({ items: mergeItems(c.items, e), hasEarlier: e.hasEarlier, unavailable: null })));
+  api.chat.onScreen((e) => patchChat(e.session, () => ({ screen: e.state, busy: e.busy })));
+  api.chat.onUnavailable((e) => patchChat(e.session, () => ({ unavailable: e.reason })));
   setState({ config, systemTheme, view: config ? 'connect' : 'settings' });
   if (config) void connect();
 }
@@ -143,7 +169,8 @@ export function updateLayout(fn: (l: SidebarLayout) => SidebarLayout): void {
 }
 
 export function openSession(name: string | null): void {
-  setState({ current: name });
+  if (name !== state.current) setState({ current: name, viewOverride: null });
+  patchChat(name, () => ({ screen: null }));
   const cfg = state.config;
   if (cfg && name && cfg.lastSession !== name) {
     const next = { ...cfg, lastSession: name };
@@ -183,4 +210,8 @@ const demoHost = new URLSearchParams(location.search).get('demoHost');
 /** Адрес ВМ для показа; на демо-скриншотах подменяется. */
 export function displayHost(host: string): string {
   return demoHost ?? host;
+}
+
+export function setViewOverride(v: 'terminal' | null): void {
+  setState({ viewOverride: v });
 }

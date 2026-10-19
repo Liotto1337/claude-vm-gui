@@ -14,9 +14,13 @@ const EXIT_TEXT: Record<Exclude<ExitReason, 'connection-lost'>, string> = {
 };
 
 /** xterm.js, привязанный к PTY-каналу `tmux attach` выбранной сессии. */
-export function TerminalView({ name }: { name: string }) {
+/** hidden — показана лента: терминал остаётся в разметке (размер PTY не меняется), но невидим. */
+export function TerminalView({ name, hidden = false }: { name: string; hidden?: boolean }) {
   const host = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
+  const fitRef = useRef<FitAddon | null>(null);
+  const hiddenRef = useRef(hidden);
+  hiddenRef.current = hidden;
   const { theme } = useAppState();
   const [exit, setExit] = useState<Exclude<ExitReason, 'connection-lost'> | null>(null);
   const [attempt, setAttempt] = useState(0);
@@ -37,6 +41,7 @@ export function TerminalView({ name }: { name: string }) {
     term.loadAddon(fit);
     term.open(el);
     termRef.current = term;
+    fitRef.current = fit;
     fit.fit();
 
     const copySelection = () => {
@@ -89,7 +94,7 @@ export function TerminalView({ name }: { name: string }) {
     const input = term.onData((d) => api.term.write(d));
     void api.term.open(name, term.cols, term.rows).then((r) => {
       if (!r.ok) setExit('killed');
-      else term.focus();
+      else if (!hiddenRef.current) term.focus();
     });
 
     const ro = new ResizeObserver(() => {
@@ -115,8 +120,16 @@ export function TerminalView({ name }: { name: string }) {
     if (termRef.current) termRef.current.options.theme = terminalTheme(theme);
   }, [theme]);
 
+  // Снова видим — подогнать размер и отдать фокус
+  useEffect(() => {
+    if (hidden || !termRef.current) return;
+    fitRef.current?.fit();
+    api.term.resize(termRef.current.cols, termRef.current.rows);
+    termRef.current.focus();
+  }, [hidden]);
+
   return (
-    <section aria-label="Терминал" className="terminal-card">
+    <section aria-label="Терминал" className={hidden ? 'terminal-card is-hidden' : 'terminal-card'} aria-hidden={hidden || undefined}>
       <div ref={host} className="terminal-host" />
       {exit ? (
         <div className="terminal-exit" role="status">

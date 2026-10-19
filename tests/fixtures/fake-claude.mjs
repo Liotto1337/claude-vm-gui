@@ -3,10 +3,10 @@
 // включает bracketed paste и воспроизводит баг: вставка «обрабатывается» 250 мс, всё пришедшее за это время
 // (в том числе Enter) теряется. Пишет sessions/<pid>.json и журнал, если задан CVG_CLAUDE_DIR.
 // Команды: «menu» — меню из трёх вариантов; «busy» — 3 с «работы».
-// CVG_FAKE_SLOW_ACCEPT=1 — поле очищается через 1200 мс после Enter.
+// CVG_FAKE_SLOW_ACCEPT=1 — поле очищается через 1200 мс после Enter. CVG_FAKE_SEED — начальный журнал (копируется при старте).
 import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { appendFileSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { appendFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const PASTE_MS = 250;
@@ -184,6 +184,10 @@ process.stdin.setRawMode?.(true);
 process.stdin.setEncoding('utf8');
 process.stdin.on('data', onData);
 process.stdout.write('\x1b[?2004h');
+if (dir && process.env.CVG_FAKE_SEED) {
+  mkdirSync(join(dir, 'projects', slug), { recursive: true });
+  writeFileSync(join(dir, 'projects', slug, `${sessionId}.jsonl`), readFileSync(process.env.CVG_FAKE_SEED));
+}
 writeSession('idle');
 const cleanup = () => {
   if (dir) rmSync(join(dir, 'sessions', `${process.pid}.json`), { force: true });

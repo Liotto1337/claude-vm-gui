@@ -20,6 +20,8 @@
   --btn-dark-bg: #141413;
   --btn-dark-text: #faf9f5;
   --term-bg: #ffffff;
+  --bubble: #f0eee6;
+  --chart: var(--accent-strong);
   color-scheme: light;
 }
 
@@ -43,6 +45,8 @@
   --btn-dark-bg: #faf9f5;
   --btn-dark-text: #141413;
   --term-bg: #1f1e1d;
+  --bubble: #3a3a37;
+  --chart: var(--accent-strong);
   color-scheme: dark;
 }
 

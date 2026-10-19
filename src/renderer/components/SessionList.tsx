@@ -291,12 +291,12 @@ export function SessionList() {
       </ul>
       {pages.length > 1 ? (
         <div className="pager">
-          <button type="button" className="icon-btn" aria-label="Предыдущая страница" disabled={pageIdx === 0}
+          <button type="button" className="pager-btn" aria-label="Предыдущая страница" disabled={pageIdx === 0}
             onClick={() => setPage(pageIdx - 1)} onDragEnter={flipOnHover(pageIdx - 1)} onDragOver={(e) => drag && e.preventDefault()} onDragLeave={cancelFlip}>
             <IconChevronLeft />
           </button>
           <span className="caption">{pageIdx + 1} / {pages.length}</span>
-          <button type="button" className="icon-btn" aria-label="Следующая страница" disabled={pageIdx === pages.length - 1}
+          <button type="button" className="pager-btn" aria-label="Следующая страница" disabled={pageIdx === pages.length - 1}
             onClick={() => setPage(pageIdx + 1)} onDragEnter={flipOnHover(pageIdx + 1)} onDragOver={(e) => drag && e.preventDefault()} onDragLeave={cancelFlip}>
             <IconChevronRight size={14} />
           </button>
