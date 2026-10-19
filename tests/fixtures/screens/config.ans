@@ -1,0 +1,23 @@
+
+[2m[37m  ⎿  [0m[39m[49mKept model as [97mOpus 5.5[39m
+[97m▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔[39m [2m[37m● high · /effort[0m[97m[49m ▔
+[39m   [1m[97mSettings[0m[39m[49m  Status  [1;7m Config [0m[39m[49m  Usage   Stats
+
+   [97m╭────────────────────────────────────────────────────────────────────────╮[39m
+   [97m│[39m ⌕ [2m[37mSearch settings…[0m[39m[49m                                                     [97m│[39m
+   [97m╰────────────────────────────────────────────────────────────────────────╯[39m
+
+   [2m[37m❯[0m[39m[49m Auto-compact                           true
+     Idle compaction                        true
+     Continue automatically at usage limit  true
+     Switch models when a message is flag…  Not asked yet[2m[37m ›[0m[39m[49m
+     Show tips                              true
+     Claude-drafted feedback                notify
+     Reduce motion                          false
+     Thinking mode                          [2m[37mtrue[0m[39m[49m
+     [2m[37mThinking can't be turned off for Opus 5.5[0m[39m[49m
+     Prompt suggestions                     true
+     Session recap                          true
+     [2m[37m↓ 35 more[0m[39m[49m
+
+   [2m[37mType to filter · Enter/↓ to select · ↑ to tabs · Esc to clear[0m[39m[49m

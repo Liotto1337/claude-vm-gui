@@ -1,0 +1,23 @@
+
+[2m[37m✻[0m[39m[49m [2m[37mBaked for 0s · done 5:52 PM[0m[39m[49m
+
+[37m[40m❯ [97mslow: подумай[39m
+
+[97m[49m●[39m готово
+
+[2m[37m✻[0m[39m[49m [2m[37mCrunched for 8s · done 5:52 PM[0m[39m[49m
+[97m▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔
+[39m   [1m[97mSelect model[0m[39m[49m
+   [2m[37mSwitch between Claude models. Your pick becomes the default for new [0m[39m[49m
+   [2m[37msessions. For other/previous model names, specify with --model.[0m[39m[49m
+
+     [2m[37m1. [0m[39m[49mDefault (recommended)  [31mOpus 5.5[2m[37m · Best for everyday, complex tasks[0m[39m[49m
+   [97m❯[39m [2m[37m2. [0m[32m[49mOpus[39m [32m✔[39m                 [31mOpus 5.5[2m[37m · Best for everyday, complex tasks · [0m[39m[49m
+                               [2m[37m~2× usage vs Sonnet[0m[39m[49m
+   [2m[37m↓[0m[39m[49m [2m[37m3. [0m[39m[49mFable                  [2m[37mFable 5.1 · Most capable for your hardest and [0m[39m[49m
+                               [2m[37mlongest-running tasks · Requires usage credits[0m[39m[49m
+      [2m[37m… +2 models[0m[39m[49m
+
+   [31m●[2m[37m High effort[0m[30m[49m ←/→ to adjust[39m
+
+   [2m[37mEnter to set as default · s to use this session only · Esc to cancel[0m[39m[49m

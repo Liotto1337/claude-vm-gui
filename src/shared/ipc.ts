@@ -84,6 +84,19 @@ export interface UploadProgress {
 }
 
 export type ImageExt = 'png' | 'jpg' | 'gif' | 'webp';
+
+/** Клавиши, которые интерфейс может отправить в claude (карточка меню, «Остановить»). */
+export type MenuKey = 'up' | 'down' | 'left' | 'right' | 'enter' | 'esc' | 'tab' | 'shift-tab'
+  | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9';
+
+export interface MenuOption { n: number | null; label: string; description: string; selected: boolean }
+/** Меню Claude Code, разобранное с экрана: запрос разрешения, AskUserQuestion, /model и т. п. */
+export interface ParsedMenu { title: string; context: string[]; options: MenuOption[]; notes: string[]; hint: string | null }
+export type ScreenState =
+  | { kind: 'no-claude' }
+  | { kind: 'prompt'; status: string | null; input: string }
+  | { kind: 'menu'; menu: ParsedMenu }
+  | { kind: 'unknown' };
 export type ExitReason = 'detached' | 'killed' | 'connection-lost';
 export type Unsubscribe = () => void;
 

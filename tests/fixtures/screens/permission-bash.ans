@@ -1,0 +1,23 @@
+
+[2m[37m✻[0m[39m[49m [2m[37mBaked for 1s · done 5:50 PM[0m[39m[49m
+
+[37m[40m❯ [97mbash: touch /tmp/project
+
+[2m[37m[49m●[0m[39m[49m Тест
+[2m[37m  ⎿  $ touch /tmp/project
+
+[97m────────────────────────────────────────────────────────────────────────────────
+[39m [1m[97mBash command[0m[39m[49m
+ [1mTip: auto mode handles these prompts for you — choose "switch to auto mode" [0m[39m[49m
+ [1mbelow[0m[39m[49m
+ [2m[37mтест[0m[39m[49m
+[30m╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+[39m touch /tmp/project
+[30m╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+[39m Do you want to proceed?
+ [97m❯[39m [2m[37m1. [0m[97m[49mYes[39m
+   [2m[37m2. [0m[39m[49mYes, and always allow access to [1m/tmp/project from this project
+   [2m[37m3. [0m[39m[49mYes, and switch to auto mode[2m[37m · auto mode handles these prompts for you[0m[39m[49m
+   [2m[37m4. [0m[39m[49mNo
+
+ [2m[37mEsc to cancel · Tab to amend[0m[39m[49m

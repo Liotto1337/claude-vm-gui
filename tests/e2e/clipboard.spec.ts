@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 import { execFileSync } from 'node:child_process';
 import { expect, test } from '@playwright/test';
 import { hasTestKey, launchApp, TEST_KEY, trustedKnownHosts, withConfig } from './helpers';
