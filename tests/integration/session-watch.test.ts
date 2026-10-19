@@ -99,6 +99,33 @@ describe.skipIf(!hasTestKey)('наблюдение за сессией', () => {
     w.stop();
   });
 
+  it('claude — внук процесса панели: сессия всё равно находится', async () => {
+    const name = testSessionName('sw-grand');
+    created.push(name);
+    // Как npx: на переднем плане node, а claude — его дочерний процесс (внук процесса панели)
+    const wrapper = `node -e "require('child_process').spawnSync('node', ['${FAKE}'], { stdio: 'inherit' })"`;
+    process.env.CVG_CLAUDE_CMD = `CVG_CLAUDE_DIR=${claudeDir} ${wrapper}`;
+    expect((await tmux.create(name, '~', true)).ok).toBe(true);
+    const w = new SessionWatcher(conn, { claudeDir, intervalMs: 200 });
+    const found: (ClaudeSessionInfo | null)[] = [];
+    w.on('claude', (c) => found.push(c));
+    w.start(name);
+    await expect.poll(() => found[found.length - 1]?.sessionId, { timeout: 8000 }).toMatch(/^[0-9a-f-]{36}$/);
+    w.stop();
+  });
+
+  it('claude запущен, а файла сессии нет — событие с running=true', async () => {
+    const name = testSessionName('sw-nofile');
+    created.push(name);
+    await conn.exec(`tmux new-session -d -s ${name} -x 100 -y 30 'node ${FAKE}'`);
+    const w = new SessionWatcher(conn, { claudeDir, intervalMs: 200 });
+    const events: [ClaudeSessionInfo | null, boolean][] = [];
+    w.on('claude', (c, running) => events.push([c, running]));
+    w.start(name);
+    await expect.poll(() => events.some(([c, r]) => c === null && r === true), { timeout: 8000 }).toBe(true);
+    w.stop();
+  });
+
   it('после stop событий нет', async () => {
     const { w, screens } = await watch('sw-stop', true);
     await expect.poll(() => screens.length, { timeout: 8000 }).toBeGreaterThan(0);

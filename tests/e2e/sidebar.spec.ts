@@ -158,3 +158,23 @@ test('Shift+F10 открывает меню сессии, Esc закрывает
     await app.close();
   }
 });
+
+test('раскладка переживает два перезапуска без изменений', async () => {
+  let l = await open();
+  try {
+    await item(l.page, 'cvg-test-d').click({ button: 'right' });
+    await menuItem(l.page, 'Закрепить').click();
+    await expect.poll(() => order(l.page)).toEqual(['cvg-test-d', 'cvg-test-a', 'cvg-test-b', 'cvg-test-c']);
+  } finally {
+    await l.app.close();
+  }
+  for (let i = 0; i < 2; i++) {
+    l = await open();
+    try {
+      await expect.poll(() => order(l.page)).toEqual(['cvg-test-d', 'cvg-test-a', 'cvg-test-b', 'cvg-test-c']);
+      await l.page.waitForTimeout(1500);
+    } finally {
+      await l.app.close();
+    }
+  }
+});

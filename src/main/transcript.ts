@@ -8,6 +8,7 @@ import type { SshConnection } from './ssh';
 
 const TAIL_BYTES = 1_572_864; // 1,5 МБ
 const BAD_STREAK = 20;
+const MAX_WINDOW = 64 * 1024 * 1024; // дальше гигантскую строку пропускаем
 const NOT_FOUND = 'Журнал сессии не найден';
 const UNREADABLE = 'Не удалось прочитать переписку';
 
@@ -31,6 +32,23 @@ async function readRange(conn: SshConnection, q: string, from: number, len: numb
 }
 
 /**
+ * Как readRange, но если в окне нет ни одной целой строки (строка длиннее окна — например, картинка base64),
+ * окно расширяется назад до MAX_WINDOW; дальше строка пропускается, а start всё равно сдвигается назад.
+ */
+async function readLines(conn: SshConnection, q: string, from: number, len: number): Promise<{ lines: string[]; start: number }> {
+  let f = from;
+  let l = len;
+  for (;;) {
+    const part = await readRange(conn, q, f, l);
+    if (part.lines.length > 0 || f === 0) return part;
+    if (l >= MAX_WINDOW) return { lines: [], start: f };
+    const grow = Math.min(l, f);
+    f -= grow;
+    l += grow;
+  }
+}
+
+/**
  * Хвост файла (не больше bytes) целыми строками, размер файла и смещение первой целой строки.
  * Файла нет — пустой хвост: у новой сессии Claude Code создаёт журнал только с первым сообщением.
  */
@@ -41,7 +59,7 @@ export async function readTail(conn: SshConnection, path: string, bytes: number)
   const size = Number(r.stdout.trim());
   if (r.code !== 0 || !Number.isFinite(size)) throw new Error(NOT_FOUND);
   const from = Math.max(0, size - bytes);
-  const part = await readRange(conn, q, from, size - from);
+  const part = await readLines(conn, q, from, size - from);
   return { ...part, size };
 }
 
@@ -125,7 +143,7 @@ export class TranscriptService extends EventEmitter {
     const from = Math.max(0, this.start - this.tailBytes);
     let part: { lines: string[]; start: number };
     try {
-      part = await readRange(this.conn, shellQuote(path), from, this.start - from);
+      part = await readLines(this.conn, shellQuote(path), from, this.start - from);
     } catch {
       return ok(undefined);
     }

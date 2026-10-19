@@ -1,7 +1,10 @@
 import type { MenuKey, MenuOption, ParsedMenu, ScreenState } from './ipc';
-import { DIALOG_FOOTER } from './dialog';
 
 // Разбор экрана Claude Code (tmux capture-pane). Форматы — по снимкам 2.1.303 в tests/fixtures/screens.
+
+// Подсказки внизу меню Claude Code: запрос разрешения, «доверять папке?», выбор варианта, онбординг.
+// Обычное поле ввода показывает «? for shortcuts», а во время работы — «esc to interrupt».
+export const DIALOG_FOOTER = /Enter to confirm|Esc to cancel|Enter to select|Esc to exit|Press Enter to continue/i;
 
 const ESC_SEQ = /\x1b(?:\[([0-9;:?]*)([@-~])|\][^\x07\x1b]*(?:\x07|\x1b\\)|[@-Z\\-_])/g;
 
@@ -79,14 +82,34 @@ export function parseStatus(plain: string): string | null {
 
 const indentOf = (l: string) => l.length - l.trimStart().length;
 
+/**
+ * Строка с подсказкой меню или -1. Подсказка должна быть среди трёх последних непустых строк,
+ * и ниже неё (или вокруг неё) не должно быть поля ввода: иначе это текст ответа или набранное сообщение.
+ */
+export function menuFooterIndex(plain: string): number {
+  const lines = plain.split('\n').map((l) => l.replace(/\s+$/, ''));
+  const tail = lines.map((l, i) => [l, i] as const).filter(([l]) => l.trim() !== '').slice(-3);
+  const footer = [...tail].reverse().find(([l]) => DIALOG_FOOTER.test(l));
+  if (!footer) return -1;
+  const box = inputBox(lines);
+  return box && box[1] > footer[1] ? -1 : footer[1];
+}
+
+/**
+ * Открыто ли меню Claude Code (тогда Enter выбрал бы пункт по умолчанию). Нарочно шире parseMenu:
+ * меню незнакомого вида тоже блокирует отправку.
+ */
+export function dialogOpen(paneText: string): boolean {
+  return menuFooterIndex(stripAnsi(paneText)) >= 0;
+}
+
+const MAX_TRAILING = 3; // строк между вариантами и подсказкой («… +2 models», «● High effort …»)
+
 /** Меню Claude Code внизу экрана или null. */
 export function parseMenu(plain: string): ParsedMenu | null {
   const lines = plain.split('\n').map((l) => l.replace(/\s+$/, ''));
-  const nonEmpty = lines.map((l, i) => [l, i] as const).filter(([l]) => l.trim() !== '');
-  const tail = nonEmpty.slice(-12);
-  const footer = [...tail].reverse().find(([l]) => DIALOG_FOOTER.test(l));
-  if (!footer) return null;
-  const f = footer[1];
+  const f = menuFooterIndex(plain);
+  if (f < 0) return null;
   let s = -1;
   for (let i = f - 1; i >= 0; i--)
     if (/^\s*❯\s/.test(lines[i])) {
@@ -138,11 +161,16 @@ export function parseMenu(plain: string): ParsedMenu | null {
     const [label, ...rest] = body.split(/\s{2,}/);
     options.push({ n: num ? Number(num[1]) : null, label: label.trim(), description: rest.join(' ').trim(), selected: l[c] === '❯' });
   }
+  let trailing = 0;
   for (; i < f; i++) {
     const l = lines[i].trim();
-    if (l !== '' && !isRule(l, '─╌▔')) notes.push(l);
+    if (l !== '' && !isRule(l, '─╌▔')) {
+      notes.push(l);
+      trailing++;
+    }
   }
-  if (options.length === 0) return null;
+  // Меньше двух вариантов или много строк между вариантами и подсказкой — «❯» нашёлся не в меню
+  if (options.length < 2 || trailing > MAX_TRAILING) return null;
 
   // Шапка: от ближайшей сплошной линии до вариантов; строки между пунктирами «╌» — код
   let top = start - 1;

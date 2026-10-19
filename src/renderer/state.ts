@@ -106,7 +106,11 @@ export function previewTheme(pref: VmConfig['theme']): void {
   for (const l of listeners) l();
 }
 
+/** Раскладка загружена для текущего подключения: до этого список tmux её не сверяет и не сохраняет. */
+let layoutLoaded = false;
+
 export async function connect(): Promise<void> {
+  layoutLoaded = false;
   setState({ view: 'connect', preflight: {}, connectError: null, hostKey: null });
   const r = await api.connection.connect();
   if (r.ok) {
@@ -116,6 +120,7 @@ export async function connect(): Promise<void> {
     const sessions = list.ok ? list.data : [];
     const last = state.config?.lastSession;
     setState({ layout: saved });
+    layoutLoaded = true;
     applySessions(sessions);
     setState({ view: 'main', current: sessions.some((s) => s.name === last) ? (last ?? null) : null });
   } else {
@@ -171,6 +176,8 @@ export async function refreshSessions(): Promise<void> {
 
 /** Новый список tmux: раскладка сайдбара сверяется (новые сессии — первыми среди незакреплённых). */
 function applySessions(sessions: TmuxSession[]): void {
+  // Первый опрос tmux приходит раньше раскладки — сверять пустую раскладку значит затереть сохранённую
+  if (!layoutLoaded) return setState({ sessions });
   const layout = reconcile(state.layout, sessions.map((s) => s.name));
   const changed = JSON.stringify(layout) !== JSON.stringify(state.layout);
   setState({ sessions, layout });

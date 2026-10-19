@@ -82,4 +82,14 @@ describe('parseTranscriptLines', () => {
     expect(t.summary).toBe('/a');
     expect(t.input.length).toBeLessThanOrEqual(4001);
   });
+  it('длинная строка без пробелов разбирается быстро (без квадратичного перебора)', () => {
+    const line = JSON.stringify({ type: 'user', uuid: 'big', message: { role: 'user', content: 'B'.repeat(300_000) } });
+    const t = Date.now();
+    parseAll([line]);
+    expect(Date.now() - t).toBeLessThan(500);
+  });
+  it('путь к картинке из uploads среди текста', () => {
+    const line = JSON.stringify({ type: 'user', uuid: 'p', message: { role: 'user', content: 'глянь /root/.cache/claude-vm-gui/uploads/1-a.png пожалуйста' } });
+    expect(parseAll([line]).changed[0]).toMatchObject({ text: 'глянь пожалуйста', images: 1 });
+  });
 });

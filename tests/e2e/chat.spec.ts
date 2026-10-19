@@ -22,6 +22,8 @@ test.beforeEach(() => {
   writeFileSync(seed, `${readFileSync(FIXTURE, 'utf8')}${link}\n`);
   tmux('new-session', '-d', '-s', 'cvg-test-claude', '-x', '120', '-y', '40', `CVG_CLAUDE_DIR=${claudeDir} CVG_FAKE_SEED=${seed} node ${FAKE}`);
   tmux('new-session', '-d', '-s', 'cvg-test-shell');
+  // claude без файла сессии (sessions/<pid>.json не пишется) — журнал не найти
+  tmux('new-session', '-d', '-s', 'cvg-test-nofile', '-x', '120', '-y', '40', `node ${FAKE}`);
 });
 test.afterEach(() => {
   try {
@@ -150,6 +152,17 @@ test('без claude — терминал и нет переключателя', 
   try {
     await expect(page.getByRole('region', { name: 'Терминал' })).toBeVisible({ timeout: 15_000 });
     await expect(page.getByRole('button', { name: 'Лента', exact: true })).toHaveCount(0);
+    await expect(feed(page)).toHaveCount(0);
+  } finally {
+    await app.close();
+  }
+});
+
+test('claude запущен, но сессия не найдена — терминал и плашка, а не пустая лента', async () => {
+  const { app, page } = await open('cvg-test-nofile');
+  try {
+    await expect(page.getByText('Не удалось прочитать переписку — показан терминал')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole('region', { name: 'Терминал' })).toBeVisible();
     await expect(feed(page)).toHaveCount(0);
   } finally {
     await app.close();

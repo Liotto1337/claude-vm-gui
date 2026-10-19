@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { dialogOpen } from '../../src/shared/dialog';
 import { classifyScreen, inputText, menuKeysFor, parseMenu, parseStatus, stripAnsi } from '../../src/shared/screen-parse';
 
 // Снимки настоящего Claude Code 2.1.303 (scripts/dev/capture-screen.sh)
@@ -99,4 +100,39 @@ describe('menuKeysFor', () => {
   it('без номера — стрелки и Enter', () => expect(menuKeysFor(parseMenu(plain('trust'))!, 1)).toEqual(['down', 'enter']));
   it('вверх от выбранного', () => expect(menuKeysFor(parseMenu(plain('trust-yes'))!, 0)).toEqual(['up', 'enter']));
   it('с номером — цифра', () => expect(menuKeysFor(parseMenu(plain('model'))!, 0)).toEqual(['1']));
+});
+
+// «Злые» экраны (ревью 0.2): подсказка меню в тексте ответа или в поле ввода, меню без «❯»
+describe('ложное меню', () => {
+  const rule = '─'.repeat(40);
+  const answerMentionsFooter = [
+    '❯ как устроен разбор меню?',
+    '● В конце меню Claude Code пишет «Enter to confirm · Esc to cancel».',
+    '  Так приложение понимает, что меню открыто.',
+    rule, '❯ ', rule, '  ? for shortcuts',
+  ].join('\n');
+  const typedFooter = [rule, '❯ что значит Esc to cancel', rule, '  ? for shortcuts'].join('\n');
+  const menuWithoutMarker = [
+    '❯ привет', '● готово', rule, ' Bash command', ' rm -rf build', ' Do you want to proceed?', '   1. Yes', '   2. No', ' Esc to cancel',
+  ].join('\n');
+
+  it('подсказка в тексте ответа, ниже обычное поле — prompt, не меню', () => {
+    expect(classifyScreen(answerMentionsFooter).kind).toBe('prompt');
+    expect(dialogOpen(answerMentionsFooter)).toBe(false);
+  });
+  it('«Esc to cancel» набрано в поле — prompt, не меню', () => {
+    expect(classifyScreen(typedFooter)).toMatchObject({ kind: 'prompt', input: 'что значит Esc to cancel' });
+    expect(dialogOpen(typedFooter)).toBe(false);
+  });
+  it('меню без «❯» — unknown (терминал), но отправка блокируется', () => {
+    expect(classifyScreen(menuWithoutMarker).kind).toBe('unknown');
+    expect(dialogOpen(menuWithoutMarker)).toBe(true);
+  });
+  it('настоящие меню по-прежнему распознаются', () => {
+    for (const f of ['trust', 'model', 'permission-bash', 'permission-write', 'ask']) {
+      expect(classifyScreen(fx(f)).kind).toBe('menu');
+      expect(dialogOpen(fx(f))).toBe(true);
+    }
+  });
+  it('один вариант — не меню', () => expect(parseMenu([rule, ' Вопрос', ' ❯ 1. Да', ' Esc to cancel'].join('\n'))).toBeNull());
 });

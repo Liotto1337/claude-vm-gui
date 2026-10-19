@@ -86,6 +86,34 @@ describe.skipIf(!hasTestKey)('журнал Claude Code по SSH', () => {
     svc.stop();
   });
 
+  it('последняя строка длиннее окна (картинка base64) — сообщение всё равно показано', async () => {
+    const path = join(dir, 'huge-last.jsonl');
+    const huge = JSON.stringify({ type: 'user', uuid: 'img', message: { role: 'user', content: [
+      { type: 'text', text: 'вот картинка' }, { type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'A'.repeat(2_000_000) } },
+    ] } });
+    writeFileSync(path, `${user('u0', 'до картинки')}${huge}\n`);
+    const svc = new TranscriptService(conn);
+    const { events } = collect(svc);
+    await svc.follow(path);
+    expect(events[0].items.map((i) => (i.kind === 'user' ? i.text : ''))).toEqual(['до картинки', 'вот картинка']);
+    svc.stop();
+  });
+
+  it('гигантская строка в ранней части не блокирует «Показать раньше»', async () => {
+    const path = join(dir, 'huge-early.jsonl');
+    const huge = user('big', 'B'.repeat(800_000));
+    writeFileSync(path, `${user('first', 'самое первое')}${huge}${Array.from({ length: 50 }, (_, i) => user(`t${i}`, `хвост ${i}`)).join('')}`);
+    const svc = new TranscriptService(conn, { tailBytes: 300_000 });
+    const { events } = collect(svc);
+    await svc.follow(path);
+    let guard = 0;
+    while (events[events.length - 1].hasEarlier && guard++ < 10) await svc.loadEarlier();
+    expect(events[events.length - 1].hasEarlier).toBe(false);
+    const texts = events.flatMap((e) => e.items).map((i) => (i.kind === 'user' ? i.text : ''));
+    expect(texts).toContain('самое первое');
+    svc.stop();
+  });
+
   it('файла ещё нет (новая сессия) — пустая лента, затем записи по мере появления', async () => {
     const path = join(dir, 'later.jsonl');
     const svc = new TranscriptService(conn);

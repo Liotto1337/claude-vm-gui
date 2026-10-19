@@ -143,8 +143,19 @@ export class TerminalService extends EventEmitter {
     return ok(undefined);
   }
 
-  /** Клавиша из белого списка (карточка меню, «Остановить») — только если на переднем плане claude. */
-  async key(k: MenuKey): Promise<Result<void>> {
+  private keyQueue: Promise<unknown> = Promise.resolve();
+
+  /**
+   * Клавиша из белого списка (карточка меню, «Остановить») — только если на переднем плане claude.
+   * Клавиши идут строго по очереди: иначе Enter мог бы обогнать ↓ и выбрать вариант по умолчанию.
+   */
+  key(k: MenuKey): Promise<Result<void>> {
+    const run = this.keyQueue.then(() => this.keyNow(k));
+    this.keyQueue = run.catch(() => undefined);
+    return run;
+  }
+
+  private async keyNow(k: MenuKey): Promise<Result<void>> {
     let bytes: string;
     try {
       bytes = keyBytes(k);
@@ -180,29 +191,29 @@ export class TerminalService extends EventEmitter {
     }
   }
 
-  /** Текст поля ввода; null — поля на экране нет; undefined — снимок экрана не получен. */
-  private async field(name: string): Promise<string | null | undefined> {
-    const screen = await this.probe(name);
-    return screen === null ? undefined : inputText(screen);
-  }
-
   /**
    * Ждёт, пока сообщение принято: поле опустело, изменилось или пропало совсем
-   * (Claude Code сразу показал меню — например, запрос разрешения). Иначе false через ms.
+   * (Claude Code сразу показал меню — например, запрос разрешения).
+   * 'unknown' — ни одного снимка экрана за ms: проверить нечем.
    */
-  private async accepted(name: string, before: string, ms: number): Promise<boolean> {
+  private async accepted(name: string, before: string, ms: number): Promise<'yes' | 'no' | 'unknown'> {
+    let seen = false;
     for (const t = Date.now(); Date.now() - t < ms; ) {
       await sleep(this.timings.pollMs);
-      const now = await this.field(name);
-      if (now !== undefined && (now === null || now === '' || now !== before)) return true;
+      const screen = await this.probe(name);
+      if (screen === null) continue;
+      seen = true;
+      const now = inputText(screen);
+      if (now === null || now === '' || now !== before) return 'yes';
     }
-    return false;
+    return seen ? 'no' : 'unknown';
   }
 
   /**
    * Сообщение: вставка, затем Enter — только когда Claude Code закончил обрабатывать вставку
    * (картинку, длинный текст). Enter, склеенный с концом вставки, Claude Code теряет.
-   * Если поле не изменилось — ровно один повтор Enter, потом ошибка.
+   * Если за это время открылось меню (например, запрос разрешения) — Enter не нажимается: он выбрал бы пункт.
+   * Поле не изменилось — ровно один повтор Enter, потом ошибка. Снимков экрана нет — без повтора.
    */
   async send(text: string, imagePaths: string[]): Promise<Result<void>> {
     const data = bracketedPaste(text, imagePaths);
@@ -210,14 +221,17 @@ export class TerminalService extends EventEmitter {
     const r = await this.writeChecked(() => data.slice(0, -1));
     if (!r.ok || !name) return r;
     const t = this.timings;
+    const menuOpen = () => fail<void>('PROMPT_OPEN', PROMPT_OPEN_TEXT);
 
     let prev: string | null = null;
     let ready: string | null = null;
     let recognized = false;
     for (const start = Date.now(); Date.now() - start < t.settleMaxMs; ) {
       await sleep(t.pollMs);
-      const found = await this.field(name);
-      const now = found ?? null;
+      const screen = await this.probe(name);
+      if (screen === null) continue;
+      if (dialogOpen(screen)) return menuOpen();
+      const now = inputText(screen);
       if (now !== null) recognized = true;
       if (now && now === prev) {
         ready = now;
@@ -228,6 +242,8 @@ export class TerminalService extends EventEmitter {
     if (!recognized) {
       // Поле не распознано (другой вид экрана) — как раньше, но с запасом на обработку вставки
       await sleep(t.fallbackMs);
+      const screen = await this.probe(name);
+      if (screen !== null && dialogOpen(screen)) return menuOpen();
       this.stream?.write('\r');
       return ok(undefined);
     }
@@ -235,7 +251,9 @@ export class TerminalService extends EventEmitter {
     for (let attempt = 0; attempt < 2; attempt++) {
       if (!this.stream || this.session !== name) return fail('NO_SESSION', 'Сессия не открыта');
       this.stream.write('\r');
-      if (await this.accepted(name, before, t.confirmMs)) return ok(undefined);
+      const verdict = await this.accepted(name, before, t.confirmMs);
+      // Проверить нечем — Enter, скорее всего, сработал; повтор мог бы отправить сообщение дважды
+      if (verdict !== 'no') return ok(undefined);
     }
     return fail('SEND_NOT_CONFIRMED', NOT_CONFIRMED_TEXT);
   }

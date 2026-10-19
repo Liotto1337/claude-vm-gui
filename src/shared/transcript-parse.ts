@@ -27,7 +27,23 @@ export const newParseState = (): ParseState => ({
 const MAX_RESULT_LINES = 200;
 const MAX_RESULT_CHARS = 20_000;
 const MAX_INPUT = 4000;
-const UPLOAD_PATH = /\S*\/claude-vm-gui\/uploads\/\S+\.(?:png|jpe?g|gif|webp)/g;
+const UPLOAD_DIR = '/claude-vm-gui/uploads/';
+const IMAGE_EXT = /\.(?:png|jpe?g|gif|webp)$/i;
+
+/**
+ * Пути к картинкам из uploads убираются из текста и считаются. Разбор по словам, без регулярки
+ * с \S* — на длинных строках без пробелов (base64) она уходила в квадратичный перебор.
+ */
+function stripUploads(text: string): { text: string; images: number } {
+  if (!text.includes(UPLOAD_DIR)) return { text, images: 0 };
+  let images = 0;
+  const kept = text.split(/(\s+)/).filter((tok) => {
+    const hit = tok.includes(UPLOAD_DIR) && IMAGE_EXT.test(tok);
+    if (hit) images++;
+    return !hit;
+  });
+  return { text: kept.join('').replace(/[ \t]{2,}/g, ' '), images };
+}
 
 function clipResult(text: string): string {
   const lines = text.split('\n');
@@ -182,8 +198,8 @@ export function parseTranscriptLines(lines: string[], st: ParseState): { changed
           put(sp);
           continue;
         }
-        const images = (content.match(UPLOAD_PATH) ?? []).length;
-        put({ kind: 'user', id, text: content.replace(UPLOAD_PATH, '').trim(), images });
+        const u = stripUploads(content);
+        put({ kind: 'user', id, text: u.text.trim(), images: u.images });
         continue;
       }
       if (!Array.isArray(content)) continue;
@@ -200,8 +216,8 @@ export function parseTranscriptLines(lines: string[], st: ParseState): { changed
         put(sp);
         continue;
       }
-      const text = joined.replace(/\[Image #\d+\]\s*/g, '').replace(UPLOAD_PATH, '').trim();
-      put({ kind: 'user', id, text, images: images + (joined.match(UPLOAD_PATH) ?? []).length });
+      const u = stripUploads(joined.replace(/\[Image #\d+\]\s*/g, ''));
+      put({ kind: 'user', id, text: u.text.trim(), images: images + u.images });
       continue;
     }
 

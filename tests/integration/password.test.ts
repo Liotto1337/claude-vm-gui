@@ -65,6 +65,24 @@ describe('вход по паролю', () => {
   it('нечитаемый ключ при пароле — не ошибка', async () =>
     expect(await connect(['password'], PASSWORD, '/nonexistent/key')).toEqual({ ok: true, data: undefined }));
 
+  it('ssh-agent недоступен (Windows по умолчанию), сервер предлагает ключ и пароль — входит по паролю', async () => {
+    const was = process.env.SSH_AUTH_SOCK;
+    process.env.SSH_AUTH_SOCK = '/nonexistent/agent.sock';
+    try {
+      expect(await connect(['publickey', 'password'], PASSWORD)).toEqual({ ok: true, data: undefined });
+    } finally {
+      if (was === undefined) delete process.env.SSH_AUTH_SOCK;
+      else process.env.SSH_AUTH_SOCK = was;
+    }
+  });
+
+  it('неудачная попытка не оставляет открытого соединения', async () => {
+    const r = await connect(['password'], 'wrong');
+    expect(r.ok).toBe(false);
+    await new Promise((res) => setTimeout(res, 500));
+    expect(opened[opened.length - 1].conn!.connected).toBe(false);
+  });
+
   it('пароль не попадает в сообщение об ошибке', async () => {
     const r = await connect(['password'], 'секретный-пароль');
     expect(r.ok).toBe(false);

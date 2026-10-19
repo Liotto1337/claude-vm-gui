@@ -79,8 +79,9 @@ export class SshConnection extends EventEmitter {
       }
     }
     // Ключ зашифрован или не найден — пробуем ssh-agent
+    // Агент — только если он есть: служба OpenSSH Authentication Agent в Windows по умолчанию выключена
     const agent = process.platform === 'win32' ? '\\\\.\\pipe\\openssh-ssh-agent' : process.env.SSH_AUTH_SOCK;
-    if (!agent) return null;
+    if (!agent || !existsSync(agent)) return null;
     this.authDetail = `${keyName} через ssh-agent`;
     return { agent };
   }
@@ -162,17 +163,23 @@ export class SshConnection extends EventEmitter {
         disarm();
         if (settled) return;
         settled = true;
+        // Неудачная попытка не оставляет висящего соединения
+        if (!r.ok) client.end();
         resolve(r);
       };
       arm();
 
       client.on('ready', () => {
+        // Попытка уже завершилась (таймаут, ошибка) — соединение не нужно
+        if (settled) return void client.end();
         this.client = client;
         this.sftpCache = null;
         client.on('close', () => this.onClosed(client));
         settle(ok(undefined));
       });
-      client.on('error', (err) => {
+      client.on('error', (err: Error & { level?: string }) => {
+        // Ошибка ssh-agent не фатальна: ssh2 сам переходит к следующему методу входа
+        if (err.level === 'agent') return;
         if (verdict === 'mismatch') settle(fail('HOSTKEY_MISMATCH', mismatchText));
         else if (verdict === 'rejected') settle(fail('HOSTKEY_REJECTED', 'Ключ сервера не принят'));
         else if (knownTypes.length > 0 && /host key|no matching/i.test(err.message))

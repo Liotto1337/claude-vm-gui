@@ -9,6 +9,23 @@ import { exactPane, tmuxCmd } from './tmux';
 const SEP = '__cvg_sep__';
 const SESSIONS_EVERY = 4; // связка с sessions/*.json — каждый 4-й опрос (раз в 2 с)
 
+/** pid и все его потомки по таблице `ps -eo pid=,ppid=`. */
+function descendants(root: number, table: string): number[] {
+  const kids = new Map<number, number[]>();
+  for (const l of table.split('\n')) {
+    const [pid, ppid] = l.trim().split(/\s+/).map(Number);
+    if (pid > 0 && ppid >= 0) kids.set(ppid, [...(kids.get(ppid) ?? []), pid]);
+  }
+  const out: number[] = [];
+  const stack = root > 0 ? [root] : [];
+  while (stack.length && out.length < 10_000) {
+    const p = stack.pop()!;
+    out.push(p);
+    stack.push(...(kids.get(p) ?? []));
+  }
+  return out;
+}
+
 /** Считается ли процесс панели claude (как в TerminalService.checkWritable). */
 function isClaude(command: string, children: string): boolean {
   if (command === 'claude' || (command === 'node' && /claude/i.test(children))) return true;
@@ -72,7 +89,7 @@ export class SessionWatcher extends EventEmitter {
       `P=$(${tmuxCmd()} display-message -p -t ${pane} '#{pane_id}\t#{pane_pid}\t#{pane_current_command}') || exit 3; ` +
       `echo "$P"; echo ${SEP}; PP=$(printf '%s' "$P" | cut -f2); ps -o pid=,args= -p "$PP" --ppid "$PP"; echo ${SEP}; ` +
       `${tmuxCmd()} capture-pane -e -p -t ${pane}` +
-      (withSessions ? `; echo ${SEP}; for f in ${dir}/sessions/*.json; do [ -f "$f" ] && cat "$f"; echo; done` : '');
+      (withSessions ? `; echo ${SEP}; for f in ${dir}/sessions/*.json; do [ -f "$f" ] && cat "$f"; echo; done; echo ${SEP}; ps -eo pid=,ppid=` : '');
     let out: string | null = null;
     try {
       const r = await this.conn.exec(cmd, { timeoutMs: 3000 });
@@ -84,11 +101,12 @@ export class SessionWatcher extends EventEmitter {
     }
     if (out === null || gen !== this.gen) return;
 
-    const [head = '', children = '', screen = '', sessions] = out.split(`${SEP}\n`);
+    const [head = '', children = '', screen = '', sessions, table = ''] = out.split(`${SEP}\n`);
     const [paneId = '', panePid = '', command = ''] = head.trim().split('\t');
     const claude = isClaude(command.trim(), children);
     if (withSessions) {
-      const pids = [Number(panePid), ...children.split('\n').map((l) => Number(l.trim().split(/\s+/)[0]))].filter((n) => n > 0);
+      // Все потомки процесса панели: claude бывает и внуком (npx, обёртки, bash -c)
+      const pids = descendants(Number(panePid), table);
       const records = (sessions ?? '').split('\n').filter((l) => l.trim().startsWith('{')).map((l) => {
         try {
           return JSON.parse(l) as unknown;
@@ -97,10 +115,11 @@ export class SessionWatcher extends EventEmitter {
         }
       });
       this.info = claude ? pickClaudeSession(records, pids, paneId) : null;
-      const key = JSON.stringify(this.info && { sessionId: this.info.sessionId, cwd: this.info.cwd });
+      const key = JSON.stringify([claude, this.info && { sessionId: this.info.sessionId, cwd: this.info.cwd }]);
       if (key !== this.lastClaude) {
         this.lastClaude = key;
-        this.emit('claude', this.info);
+        // второй аргумент — claude запущен: при info === null значит, что журнал не найти
+        this.emit('claude', this.info, claude);
       }
     }
     const state: ScreenState = claude ? classifyScreen(screen) : { kind: 'no-claude' };

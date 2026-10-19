@@ -107,7 +107,13 @@ export class AppController {
 
   private wireChat(watch: SessionWatcher, transcript: TranscriptService, claudeDir: string): void {
     watch.on('screen', (e) => this.hub.emit('chat:screen', { session: watch.current, ...e }));
-    watch.on('claude', (info: { sessionId: string; cwd: string } | null) => {
+    watch.on('claude', (info: { sessionId: string; cwd: string } | null, running: boolean) => {
+      // claude запущен, но его сессию не найти (нет sessions/<pid>.json) — показываем терминал
+      if (!info && running) {
+        transcript.stop();
+        this.hub.emit('chat:unavailable', { session: watch.current, reason: 'Не найдена сессия Claude Code' });
+        return;
+      }
       let path: string | null = null;
       try {
         path = info ? transcriptPath(claudeDir, info.cwd, info.sessionId) : null;

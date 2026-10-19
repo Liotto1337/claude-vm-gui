@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { SshConnection } from '../../src/main/ssh';
@@ -10,6 +11,7 @@ const FAKE = join(__dirname, '../fixtures/fake-claude.mjs');
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const RULE = '─'.repeat(60);
 const FIELD_WITH_TEXT = `${RULE}\n❯ застряло\n${RULE}\n`;
+const MENU = readFileSync(join(__dirname, '../fixtures/screens/permission-bash.ans'), 'utf8');
 const FAST: SendTimings = { pollMs: 10, settleMaxMs: 300, confirmMs: 100, fallbackMs: 10 };
 
 describe.skipIf(!hasTestKey)('отправка одним Enter', () => {
@@ -77,6 +79,32 @@ describe.skipIf(!hasTestKey)('отправка одним Enter', () => {
     const s = await screenOf(name);
     expect(s).toContain('Enter to confirm');
     expect(s).not.toContain('выбран');
+    term.close();
+  });
+
+  it('меню появилось после вставки — Enter не нажат, PROMPT_OPEN', async () => {
+    const { name, term } = await start('send-menu-before', '', { probe: async () => MENU, timings: FAST });
+    expect(await term.send('сделай', [])).toMatchObject({ ok: false, error: { code: 'PROMPT_OPEN' } });
+    await sleep(300);
+    expect(await screenOf(name)).toContain('enter×0');
+    term.close();
+  });
+
+  it('поле не распознано, а перед Enter открылось меню — Enter не нажат', async () => {
+    let n = 0;
+    const { name, term } = await start('send-menu-blind', '', { probe: async () => (n++ < 3 ? null : MENU), timings: FAST });
+    expect(await term.send('сделай', [])).toMatchObject({ ok: false, error: { code: 'PROMPT_OPEN' } });
+    await sleep(300);
+    expect(await screenOf(name)).toContain('enter×0');
+    term.close();
+  });
+
+  it('после Enter снимки не приходят — без повтора, без ошибки', async () => {
+    let n = 0;
+    const { name, term } = await start('send-noprobe', '', { probe: async () => (n++ < 2 ? FIELD_WITH_TEXT : null), timings: { ...FAST, pollMs: 200 } });
+    expect(await term.send('один раз', [])).toEqual({ ok: true, data: undefined });
+    await sleep(300);
+    expect(await screenOf(name)).toContain('enter×1');
     term.close();
   });
 
