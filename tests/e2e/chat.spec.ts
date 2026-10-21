@@ -353,3 +353,23 @@ test('claude запустили из терминала: лента вместо
     await app.close();
   }
 });
+
+test('после щелчка по ленте ↑ во время «печати» тоже не возвращает ленту вниз', async () => {
+  const l = await open();
+  try {
+    await scrollable(l);
+    await composer(l.page).fill('long');
+    await composer(l.page).press('Enter');
+    const answer = feed(l.page).locator('.md', { hasText: 'Длинный ответ' });
+    await expect(answer).toBeVisible({ timeout: 10_000 });
+    await answer.click();
+    await l.page.keyboard.press('ArrowUp');
+    // Нажатие пришлось на середину «печати» — иначе тест ничего не проверяет
+    expect(await answer.textContent()).not.toContain('Конец ответа.');
+    await expect(answer).toContainText('Конец ответа.', { timeout: 5000 });
+    await l.page.waitForTimeout(300);
+    expect(await fromBottom(l.page)).toBeGreaterThan(20);
+  } finally {
+    await l.app.close();
+  }
+});

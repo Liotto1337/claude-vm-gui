@@ -12,7 +12,8 @@ import { exactPane, exactTarget, tmuxCmd, type TmuxService } from './tmux';
 const NO_CLAUDE_TEXT = 'В сессии сейчас не claude, а обычная оболочка — текст выполнился бы как команда. Запустите claude.';
 const CHECK_FAILED_TEXT = 'Не удалось проверить терминал. Попробуйте ещё раз.';
 const NOT_CONFIRMED_TEXT = 'Claude Code не принял Enter. Посмотрите в терминал.';
-const PASTE_LOST_TEXT = 'Текст не дошёл до поля ввода Claude Code — сообщение не отправлено. Попробуйте ещё раз.';
+const PASTE_LOST_TEXT =
+  'Текст не появился в поле ввода Claude Code, Enter не нажат. Проверьте поле в терминале: если текст там, нажмите Enter в терминале, иначе отправьте ещё раз.';
 const PROMPT_OPEN_TEXT =
   'В терминале открыто меню Claude Code (например, запрос разрешения). Ответьте прямо в терминале и повторите.';
 
@@ -242,16 +243,27 @@ export class TerminalService extends EventEmitter {
       }
       prev = now;
     }
-    if (!recognized) {
-      // Поле не распознано (другой вид экрана) — как раньше, но с запасом на обработку вставки
+    // Поле не распознано (другой вид экрана) — как раньше, но с запасом на обработку вставки
+    const blindEnter = async (): Promise<Result<void>> => {
       await sleep(t.fallbackMs);
       const screen = await this.probe(name);
       if (screen !== null && dialogOpen(screen)) return menuOpen();
       this.stream?.write('\r');
       return ok(undefined);
+    };
+    let last = ready ?? prev;
+    // Распознанное поле пропало (например, bash-режим «!» рисует другое приглашение) — тоже вслепую
+    if (!recognized || last === null) return blindEnter();
+    if (last === '') {
+      // Поле всё ещё пустое: вставка медленная (большая картинка, нагруженная ВМ) или потерялась — ещё один снимок
+      await sleep(t.fallbackMs);
+      const screen = await this.probe(name);
+      if (screen !== null && dialogOpen(screen)) return menuOpen();
+      last = screen === null ? null : inputText(screen);
+      if (last === null) return blindEnter();
+      // Enter по пустому полю ничего бы не отправил, а сообщение пропало бы молча
+      if (last === '') return fail('SEND_NOT_CONFIRMED', PASTE_LOST_TEXT);
     }
-    // Поле так и осталось пустым — вставка потерялась; Enter отправил бы пустоту, а сообщение пропало бы молча
-    if (!(ready ?? prev)) return fail('SEND_NOT_CONFIRMED', PASTE_LOST_TEXT);
     for (let attempt = 0; attempt < 2; attempt++) {
       if (!this.stream || this.session !== name) return fail('NO_SESSION', 'Сессия не открыта');
       this.stream.write('\r');

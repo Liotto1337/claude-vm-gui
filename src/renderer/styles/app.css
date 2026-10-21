@@ -341,5 +341,5 @@
 [data-theme='dark'] .bubble.is-sending { background: color-mix(in srgb, var(--bubble) 35%, var(--bg)); color: var(--text-2); }
 .spinner { display: inline-block; width: 1em; text-align: center; color: var(--accent); }
 .session-header .btn-kill { color: var(--danger); }
-.session-box:focus { outline: none; }
+.session-box:focus, .chat:focus { outline: none; }
 .session-box:focus-visible { outline: 1px solid var(--accent); outline-offset: -1px; border-radius: 8px; }

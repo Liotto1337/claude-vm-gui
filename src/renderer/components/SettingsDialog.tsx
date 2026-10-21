@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import type { VmConfig } from '@shared/ipc';
+import { passwordToSave, type PasswordMode } from '../settings-password';
 import { connect, getState, previewTheme, saveConfig, setState, useAppState } from '../state';
 
 const DEFAULTS: VmConfig = { host: '', port: 22, username: 'root', keyPath: '~/.ssh/id_ed25519', theme: 'system' };
@@ -9,15 +10,14 @@ export function SettingsDialog({ onClose }: { onClose?: () => void }) {
   const [form, setForm] = useState<VmConfig>(config ?? DEFAULTS);
   const [portText, setPortText] = useState(String((config ?? DEFAULTS).port));
   const [error, setError] = useState<string | null>(null);
-  // Пароль: 'saved' — сохранён и не меняется, 'edit' — вводится новый, 'deleted' — удалить при сохранении
-  const [pwdMode, setPwdMode] = useState<'saved' | 'edit' | 'deleted'>(config?.hasPassword ? 'saved' : 'edit');
+  const [pwdMode, setPwdMode] = useState<PasswordMode>(config?.hasPassword ? 'saved' : 'edit');
   const [password, setPassword] = useState('');
   const set = (patch: Partial<VmConfig>) => setForm((f) => ({ ...f, ...patch }));
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     const next = { ...form, port: Number(portText) };
-    const pwd = pwdMode === 'deleted' && password === '' ? null : pwdMode === 'saved' || password === '' ? undefined : password;
+    const pwd = passwordToSave(pwdMode, password, config?.passwordUnreadable === true);
     const err = await saveConfig(next, pwd);
     setError(err);
     if (!err) void connect();
@@ -74,7 +74,7 @@ export function SettingsDialog({ onClose }: { onClose?: () => void }) {
             />
             {config?.passwordUnreadable && pwdMode === 'edit' ? (
               <span className="hint hint-error">
-                Сохранённый пароль не удалось расшифровать — например, приложение запущено под другой учётной записью Windows. Введите пароль заново
+                Сохранённый пароль не удалось расшифровать — например, приложение запущено под другой учётной записью Windows. Введите пароль заново или оставьте поле пустым, чтобы удалить его
               </span>
             ) : (
               <span className="hint">Хранится зашифрованным средствами Windows. Пусто — вход по ключу</span>

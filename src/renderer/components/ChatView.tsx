@@ -89,6 +89,8 @@ export function ChatView({ session }: { session: string }) {
       aria-label="Переписка"
       className="chat"
       ref={box}
+      // Щелчок по ленте отдаёт ей фокус: иначе фокус на body, Chromium листает ленту клавишами, а onKeyDown молчит
+      tabIndex={-1}
       onScroll={onScroll}
       onWheel={(e) => e.deltaY < 0 && goingUp()}
       onKeyDown={(e) => UP_KEYS.has(e.key) && goingUp()}

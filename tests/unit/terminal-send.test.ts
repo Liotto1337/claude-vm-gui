@@ -62,4 +62,22 @@ describe('TerminalService.send: принято ли сообщение', () => {
     expect((await term.send('сделай', [])).ok).toBe(true);
     expect(enters()).toBe(1);
   });
+
+  it('поле сначала пустое, потом перестало распознаваться (bash-режим «!») — не «вставка потерялась», Enter нажимается', async () => {
+    let polls = 0;
+    const { term, enters } = setup(() => (polls++ < 2 ? '' : null));
+    await term.open('s', 80, 24);
+    const r = await term.send('!ls', []);
+    expect(r.ok).toBe(true);
+    expect(enters()).toBe(1);
+  });
+
+  it('медленная вставка: поле пустое дольше ожидания, потом текст появился — Enter нажимается', async () => {
+    const t0 = Date.now();
+    const { term, enters } = setup((n) => (n > 0 ? '' : Date.now() - t0 > FAST.settleMaxMs + 5 ? 'привет' : ''));
+    await term.open('s', 80, 24);
+    const r = await term.send('привет', []);
+    expect(r.ok).toBe(true);
+    expect(enters()).toBe(1);
+  });
 });
