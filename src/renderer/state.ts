@@ -120,6 +120,8 @@ export async function connect(): Promise<void> {
   const r = await api.connection.connect();
   if (r.ok) {
     setState({ metrics: [], metricsErrorAt: null, systemInfo: null });
+    // Новое подключение — новый сбор метрик в медленном режиме; панель открыта — снова частые замеры
+    if (state.serverOpen) api.metrics.setActive(true);
     void api.metrics.info().then((i) => i.ok && setState({ systemInfo: i.data }));
     const [list, saved] = await Promise.all([api.tmux.list(), api.layout.get()]);
     const sessions = list.ok ? list.data : [];

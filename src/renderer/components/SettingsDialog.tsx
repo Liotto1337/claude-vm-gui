@@ -72,7 +72,13 @@ export function SettingsDialog({ onClose }: { onClose?: () => void }) {
               placeholder={pwdMode === 'deleted' ? 'Сохранённый пароль будет удалён' : ''}
               onChange={(e) => setPassword(e.target.value)}
             />
-            <span className="hint">Хранится зашифрованным средствами Windows. Пусто — вход по ключу</span>
+            {config?.passwordUnreadable && pwdMode === 'edit' ? (
+              <span className="hint hint-error">
+                Сохранённый пароль не удалось расшифровать — например, приложение запущено под другой учётной записью Windows. Введите пароль заново
+              </span>
+            ) : (
+              <span className="hint">Хранится зашифрованным средствами Windows. Пусто — вход по ключу</span>
+            )}
           </div>
         )}
         <div className="field">

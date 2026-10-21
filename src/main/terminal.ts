@@ -12,6 +12,7 @@ import { exactPane, exactTarget, tmuxCmd, type TmuxService } from './tmux';
 const NO_CLAUDE_TEXT = 'В сессии сейчас не claude, а обычная оболочка — текст выполнился бы как команда. Запустите claude.';
 const CHECK_FAILED_TEXT = 'Не удалось проверить терминал. Попробуйте ещё раз.';
 const NOT_CONFIRMED_TEXT = 'Claude Code не принял Enter. Посмотрите в терминал.';
+const PASTE_LOST_TEXT = 'Текст не дошёл до поля ввода Claude Code — сообщение не отправлено. Попробуйте ещё раз.';
 const PROMPT_OPEN_TEXT =
   'В терминале открыто меню Claude Code (например, запрос разрешения). Ответьте прямо в терминале и повторите.';
 
@@ -192,11 +193,12 @@ export class TerminalService extends EventEmitter {
   }
 
   /**
-   * Ждёт, пока сообщение принято: поле опустело, изменилось или пропало совсем
+   * Ждёт, пока сообщение принято: поле опустело или пропало совсем
    * (Claude Code сразу показал меню — например, запрос разрешения).
+   * Поле изменилось, но не пустое — это поздняя отрисовка вставки (путь стал «[Image #1]»), а не отправка.
    * 'unknown' — ни одного снимка экрана за ms: проверить нечем.
    */
-  private async accepted(name: string, before: string, ms: number): Promise<'yes' | 'no' | 'unknown'> {
+  private async accepted(name: string, ms: number): Promise<'yes' | 'no' | 'unknown'> {
     let seen = false;
     for (const t = Date.now(); Date.now() - t < ms; ) {
       await sleep(this.timings.pollMs);
@@ -204,7 +206,7 @@ export class TerminalService extends EventEmitter {
       if (screen === null) continue;
       seen = true;
       const now = inputText(screen);
-      if (now === null || now === '' || now !== before) return 'yes';
+      if (now === null || now === '') return 'yes';
     }
     return seen ? 'no' : 'unknown';
   }
@@ -213,7 +215,8 @@ export class TerminalService extends EventEmitter {
    * Сообщение: вставка, затем Enter — только когда Claude Code закончил обрабатывать вставку
    * (картинку, длинный текст). Enter, склеенный с концом вставки, Claude Code теряет.
    * Если за это время открылось меню (например, запрос разрешения) — Enter не нажимается: он выбрал бы пункт.
-   * Поле не изменилось — ровно один повтор Enter, потом ошибка. Снимков экрана нет — без повтора.
+   * Поле не опустело — ровно один повтор Enter, потом ошибка. Снимков экрана нет — без повтора.
+   * Поле пустое ещё до Enter — вставка не дошла: ошибка без Enter.
    */
   async send(text: string, imagePaths: string[]): Promise<Result<void>> {
     const data = bracketedPaste(text, imagePaths);
@@ -247,11 +250,12 @@ export class TerminalService extends EventEmitter {
       this.stream?.write('\r');
       return ok(undefined);
     }
-    const before = ready ?? prev ?? '';
+    // Поле так и осталось пустым — вставка потерялась; Enter отправил бы пустоту, а сообщение пропало бы молча
+    if (!(ready ?? prev)) return fail('SEND_NOT_CONFIRMED', PASTE_LOST_TEXT);
     for (let attempt = 0; attempt < 2; attempt++) {
       if (!this.stream || this.session !== name) return fail('NO_SESSION', 'Сессия не открыта');
       this.stream.write('\r');
-      const verdict = await this.accepted(name, before, t.confirmMs);
+      const verdict = await this.accepted(name, t.confirmMs);
       // Проверить нечем — Enter, скорее всего, сработал; повтор мог бы отправить сообщение дважды
       if (verdict !== 'no') return ok(undefined);
     }

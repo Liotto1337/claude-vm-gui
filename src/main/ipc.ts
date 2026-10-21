@@ -41,7 +41,7 @@ export class IpcHub {
   }
 
   config(): VmConfig | null {
-    return loadConfig(this.paths);
+    return loadConfig(this.paths, safeBox);
   }
 
   /** Сохранённый пароль — только для SSH в главном процессе, в интерфейс не уходит. */

@@ -36,3 +36,22 @@ describe('TerminalService.key', () => {
     expect(writes).toEqual(['\x1b[B', '\r']);
   });
 });
+
+describe('TerminalService.open', () => {
+  it('устаревший open (ответ пришёл после более нового) не делает свою сессию текущей', async () => {
+    const stream = () => Object.assign(new EventEmitter(), { stderr: new EventEmitter(), write: () => {}, setWindow: () => {}, close: () => {} });
+    const waits = [80, 5];
+    let n = 0;
+    const conn = Object.assign(new EventEmitter(), {
+      connected: true,
+      openPty: async () => {
+        await new Promise((r) => setTimeout(r, waits[n++]));
+        return stream();
+      },
+    });
+    const term = new TerminalService(conn as unknown as SshConnection, {} as TmuxService);
+    const [old, cur] = await Promise.all([term.open('old', 80, 24), term.open('cur', 80, 24)]);
+    expect(old.ok && cur.ok).toBe(true);
+    expect(term.current).toBe('cur');
+  });
+});

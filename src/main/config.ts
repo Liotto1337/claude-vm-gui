@@ -12,8 +12,8 @@ export interface SecretBox {
   decrypt(b: Buffer): string;
 }
 
-/** Как лежит в config.json: VmConfig без hasPassword, плюс зашифрованный пароль. */
-type StoredConfig = Omit<VmConfig, 'hasPassword'> & { passwordEnc?: string };
+/** Как лежит в config.json: VmConfig без признаков пароля, плюс зашифрованный пароль. */
+type StoredConfig = Omit<VmConfig, 'hasPassword' | 'passwordUnreadable'> & { passwordEnc?: string };
 
 export function expandHome(p: string): string {
   return p === '~' ? homedir() : p.startsWith('~/') || p.startsWith('~\\') ? join(homedir(), p.slice(2)) : p;
@@ -31,16 +31,21 @@ function readJson(path: string): Partial<StoredConfig> | null {
 /**
  * Настройки подключения: config.json в папке данных приложения,
  * а при разработке (передан repoDir) — vm.config.json в корне репозитория.
- * Пароль сюда не попадает — только признак hasPassword.
+ * Пароль сюда не попадает — только признак hasPassword. С box пароль проверяется:
+ * не расшифровался (другая учётная запись Windows) — вместо hasPassword признак passwordUnreadable.
  */
-export function loadConfig(opts: { userDataDir: string; repoDir?: string }): VmConfig | null {
+export function loadConfig(opts: { userDataDir: string; repoDir?: string }, box?: SecretBox): VmConfig | null {
   const raw =
     readJson(join(opts.userDataDir, 'config.json')) ?? (opts.repoDir ? readJson(join(opts.repoDir, 'vm.config.json')) : null);
   if (!raw || typeof raw.host !== 'string' || raw.host.trim() === '') return null;
   const { passwordEnc, ...rest } = raw;
   const cfg: VmConfig = { ...DEFAULTS, ...rest, host: raw.host.trim() };
   delete (cfg as Partial<VmConfig>).hasPassword;
-  if (typeof passwordEnc === 'string' && passwordEnc !== '') cfg.hasPassword = true;
+  delete (cfg as Partial<VmConfig>).passwordUnreadable;
+  if (typeof passwordEnc === 'string' && passwordEnc !== '') {
+    if (box && decrypt(box, passwordEnc) === null) cfg.passwordUnreadable = true;
+    else cfg.hasPassword = true;
+  }
   return { ...cfg, keyPath: expandHome(cfg.keyPath ?? '') };
 }
 
@@ -48,6 +53,10 @@ export function loadConfig(opts: { userDataDir: string; repoDir?: string }): VmC
 export function loadPassword(userDataDir: string, box: SecretBox): string | null {
   const enc = readJson(join(userDataDir, 'config.json'))?.passwordEnc;
   if (typeof enc !== 'string' || enc === '') return null;
+  return decrypt(box, enc);
+}
+
+function decrypt(box: SecretBox, enc: string): string | null {
   try {
     return box.decrypt(Buffer.from(enc, 'base64'));
   } catch {
@@ -79,7 +88,7 @@ export function saveConfig(userDataDir: string, c: VmConfig, password?: string |
   }
   const err = validateConfig(c, passwordEnc !== undefined);
   if (err) return fail('CONFIG_INVALID', err);
-  const { hasPassword: _ignored, ...rest } = c;
+  const { hasPassword: _has, passwordUnreadable: _unreadable, ...rest } = c;
   const stored: StoredConfig = { ...rest, host: c.host.trim(), ...(passwordEnc ? { passwordEnc } : {}) };
   mkdirSync(userDataDir, { recursive: true });
   writeFileSync(path, JSON.stringify(stored, null, 2));

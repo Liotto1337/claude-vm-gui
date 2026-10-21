@@ -126,3 +126,30 @@ describe('пароль', () => {
     expect(loadPassword(dir, { ...box, decrypt: () => { throw new Error('bad'); } })).toBeNull();
   });
 });
+
+describe('пароль, который не расшифровать (другой профиль Windows)', () => {
+  const good = { host: 'vm.example', port: 22, username: 'root', keyPath: '~/.ssh/id_ed25519', theme: 'system' as const };
+  const box: SecretBox = { available: () => true, encrypt: (s) => Buffer.from(`enc:${s}`), decrypt: (b) => b.toString().replace(/^enc:/, '') };
+  const broken: SecretBox = { available: () => true, encrypt: box.encrypt, decrypt: () => { throw new Error('DPAPI'); } };
+
+  it('расшифровывается — «пароль сохранён»', () => {
+    const d = dirs();
+    saveConfig(d.userDataDir, good, 'secret', box);
+    expect(loadConfig(d, box)).toMatchObject({ hasPassword: true });
+    expect(loadConfig(d, box)).not.toHaveProperty('passwordUnreadable');
+  });
+
+  it('не расшифровывается — не «сохранён», а признак passwordUnreadable', () => {
+    const d = dirs();
+    saveConfig(d.userDataDir, good, 'secret', box);
+    const c = loadConfig(d, broken);
+    expect(c).not.toHaveProperty('hasPassword');
+    expect(c).toMatchObject({ passwordUnreadable: true });
+  });
+
+  it('признак не записывается в config.json при сохранении', () => {
+    const d = dirs();
+    saveConfig(d.userDataDir, { ...good, passwordUnreadable: true }, undefined, box);
+    expect(JSON.parse(readFileSync(join(d.userDataDir, 'config.json'), 'utf8'))).not.toHaveProperty('passwordUnreadable');
+  });
+});

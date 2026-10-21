@@ -1,0 +1,65 @@
+import { EventEmitter } from 'node:events';
+import { describe, expect, it } from 'vitest';
+import type { SshConnection } from '../../src/main/ssh';
+import { TerminalService } from '../../src/main/terminal';
+import type { TmuxService } from '../../src/main/tmux';
+
+// Отправка: вставка → ждём, пока поле устоится → Enter → проверяем, что сообщение принято.
+// Поле ввода задаётся функцией от числа нажатых Enter; null — поля нет (открылось меню).
+const RULE = '─'.repeat(40);
+const toScreen = (field: string | null) =>
+  field === null ? 'история\n Хотите продолжить?\n' : `история\n${RULE}\n❯ ${field}\n${RULE}\n  ? for shortcuts\n`;
+const FAST = { pollMs: 5, settleMaxMs: 200, confirmMs: 120, fallbackMs: 10 };
+
+function setup(field: (enters: number) => string | null) {
+  const writes: string[] = [];
+  const stream = Object.assign(new EventEmitter(), {
+    stderr: new EventEmitter(),
+    write: (d: string) => void writes.push(d),
+    setWindow: () => {},
+    close: () => {},
+  });
+  const conn = Object.assign(new EventEmitter(), {
+    connected: true,
+    openPty: async () => stream,
+    exec: async () => ({ code: 0, stdout: `claude\t1\n__cvg_sep__\nclaude\n__cvg_sep__\n${toScreen(field(0))}`, stderr: '' }),
+  });
+  const enters = () => writes.filter((w) => w === '\r').length;
+  const term = new TerminalService(conn as unknown as SshConnection, {} as TmuxService, {
+    probe: async () => toScreen(field(enters())),
+    timings: FAST,
+  });
+  return { term, enters };
+}
+
+describe('TerminalService.send: принято ли сообщение', () => {
+  it('поздняя отрисовка вставки (путь стал [Image #1]) — не «принято», Enter повторяется', async () => {
+    const { term, enters } = setup((n) => (n === 0 ? '/u/1.png посмотри' : n === 1 ? '[Image #1] посмотри' : ''));
+    expect((await term.open('s', 80, 24)).ok).toBe(true);
+    const r = await term.send('посмотри', ['/u/1.png']);
+    expect(r.ok).toBe(true);
+    expect(enters()).toBe(2);
+  });
+
+  it('поле опустело после Enter — принято с первого раза', async () => {
+    const { term, enters } = setup((n) => (n === 0 ? 'привет' : ''));
+    await term.open('s', 80, 24);
+    expect((await term.send('привет', [])).ok).toBe(true);
+    expect(enters()).toBe(1);
+  });
+
+  it('вставка не дошла (поле пустое) — ошибка, Enter не нажимается', async () => {
+    const { term, enters } = setup(() => '');
+    await term.open('s', 80, 24);
+    const r = await term.send('привет', []);
+    expect(r.ok).toBe(false);
+    expect(enters()).toBe(0);
+  });
+
+  it('после Enter открылось меню (поля нет) — принято', async () => {
+    const { term, enters } = setup((n) => (n === 0 ? 'сделай' : null));
+    await term.open('s', 80, 24);
+    expect((await term.send('сделай', [])).ok).toBe(true);
+    expect(enters()).toBe(1);
+  });
+});

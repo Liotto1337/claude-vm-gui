@@ -59,7 +59,8 @@ export class AppController {
     h.handle('term:open', (name: string, cols: number, rows: number) =>
       this.need(async (s) => {
         const r = await s.term.open(name, cols, rows);
-        if (r.ok) this.startChat(s, name);
+        // Устаревший open (пока открывался канал, выбрали другую сессию) тоже ok — ленту запускаем только для текущей
+        if (r.ok && s.term.current === name) this.startChat(s, name);
         return r;
       }),
     );
@@ -158,6 +159,8 @@ export class AppController {
     const r = await conn.connect();
     if (!r.ok) {
       conn.close();
+      if (r.error.code === 'AUTH_FAILED' && cfg.passwordUnreadable)
+        return fail('AUTH_FAILED', `${r.error.message}. Сохранённый пароль не удалось расшифровать (другая учётная запись Windows?) — введите его заново в настройках`);
       return r;
     }
 

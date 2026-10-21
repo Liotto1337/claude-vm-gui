@@ -61,7 +61,14 @@ export class MetricsService extends EventEmitter {
   }
 
   private async sample(gen: number): Promise<void> {
-    if (this.busy || !this.conn.connected) return;
+    if (this.busy) return;
+    if (!this.conn.connected) {
+      // Переподключение: замер с ошибкой, чтобы панель показала «нет данных N с», а не застывшие цифры
+      this.prev = null;
+      const empty = { cpu: null, load: null, uptimeSec: null, mem: null, disks: [], net: null, procs: [] };
+      this.emit('sample', { t: Date.now(), ...empty, error: 'Нет подключения к ВМ' } satisfies MetricsSample);
+      return;
+    }
     this.busy = true;
     const cmd = [
       'head -n 1 /proc/stat',

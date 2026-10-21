@@ -31,6 +31,8 @@ export interface VmConfig {
   lastSession?: string;
   /** Только чтение: пароль сохранён (сам пароль в интерфейс не передаётся) */
   hasPassword?: boolean;
+  /** Только чтение: пароль сохранён, но не расшифровывается (другая учётная запись Windows) — нужно ввести заново */
+  passwordUnreadable?: boolean;
 }
 
 export type PreflightStep = 'ping' | 'tcp' | 'ssh' | 'tmux';
