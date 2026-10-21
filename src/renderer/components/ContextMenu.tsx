@@ -74,7 +74,7 @@ export function ContextMenu(props: { label: string; x: number; y: number; items:
         <div key={`sep-${i}`} role="separator" className="ctx-sep" />
       ) : (
         <button
-          key={e.label}
+          key={`${i}-${e.label}`} // имена групп могут повторяться
           type="button"
           role="menuitem"
           disabled={e.disabled}

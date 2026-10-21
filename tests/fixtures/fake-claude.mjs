@@ -2,7 +2,8 @@
 // Фейковый Claude Code для тестов: рисует поле ввода как настоящий (линии «─», «❯», серая подсказка),
 // включает bracketed paste и воспроизводит баг: вставка «обрабатывается» 250 мс, всё пришедшее за это время
 // (в том числе Enter) теряется. Пишет sessions/<pid>.json и журнал, если задан CVG_CLAUDE_DIR.
-// Команды: «menu» — меню из трёх вариантов; «busy» — 3 с «работы»; «long» — длинный ответ в журнал.
+// Команды: «menu» — меню из трёх вариантов; «busy» — 3 с «работы»; «long» — длинный ответ в журнал;
+// «grow» — ответ, который через 300 мс дописывается той же записью (тот же uuid).
 // CVG_FAKE_SLOW_ACCEPT=1 — поле очищается через 1200 мс после Enter. CVG_FAKE_SEED — начальный журнал (копируется при старте).
 import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
@@ -45,13 +46,13 @@ function writeSession(st) {
     JSON.stringify({ pid: process.pid, sessionId, cwd, tmux: tmuxField(), status: st, kind: 'interactive', version: 'fake' }));
 }
 
-function record(type, content) {
+function record(type, content, uuid = randomUUID()) {
   if (!dir) return;
   const p = join(dir, 'projects', slug);
   mkdirSync(p, { recursive: true });
   const rec = type === 'user'
-    ? { type: 'user', uuid: randomUUID(), sessionId, timestamp: new Date().toISOString(), message: { role: 'user', content } }
-    : { type: 'assistant', uuid: randomUUID(), sessionId, timestamp: new Date().toISOString(), message: { role: 'assistant', content: [{ type: 'text', text: content }] } };
+    ? { type: 'user', uuid, sessionId, timestamp: new Date().toISOString(), message: { role: 'user', content } }
+    : { type: 'assistant', uuid, sessionId, timestamp: new Date().toISOString(), message: { role: 'assistant', content: [{ type: 'text', text: content }] } };
   appendFileSync(join(p, `${sessionId}.jsonl`), `${JSON.stringify(rec)}\n`);
 }
 
@@ -83,6 +84,11 @@ function submit() {
   images = 0;
   if (text.trim() === 'long') {
     record('assistant', `Длинный ответ для проверки «печати». ${'Текст абзаца идёт дальше и дальше. '.repeat(18)}Конец ответа.`);
+  } else if (text.trim() === 'grow') {
+    const id = randomUUID();
+    const head = `Начало растущего ответа. ${'Слова идут одно за другим. '.repeat(6)}`;
+    record('assistant', head, id);
+    setTimeout(() => record('assistant', `${head}Хвост растущего ответа.`, id), 300);
   } else if (text.trim() === 'menu') {
     menu = { selected: 0 };
     writeSession('waiting');

@@ -35,6 +35,12 @@ export function Composer({ session, menu = null, working = false, chatMode = fal
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [sendError, setSendError] = useState<string | null>(null);
   const box = useRef<HTMLTextAreaElement>(null);
+  // Карточка меню закрылась (поле снова доступно) и фокус никому не достался — обратно в поле
+  const wasMenu = useRef(menuOpen);
+  useEffect(() => {
+    if (wasMenu.current && !menuOpen && (!document.activeElement || document.activeElement === document.body)) box.current?.focus();
+    wasMenu.current = menuOpen;
+  }, [menuOpen]);
   // Отправка уже идёт — второй Enter не должен отправить то же сообщение ещё раз
   const sending = useRef(false);
   const [busy, setBusy] = useState(false);

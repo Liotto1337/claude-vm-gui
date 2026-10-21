@@ -14,6 +14,25 @@ export function revealCount(len: number, ms: number): number {
   return Math.min(len, Math.floor((ms / 1000) * typingSpeed(len)));
 }
 
+/** Ответ длиннее — сразу целиком: разбор Markdown на каждом кадре печати тормозит на десятках КБ. */
+export const TYPE_MAX_CHARS = 10_000;
+
+/**
+ * Какие ответы «печатаются» после порции ленты: id → время начала.
+ * Печатаются только новые ответы из живого журнала; история при открытии и «Показать раньше» — сразу,
+ * новая лента (reset: /clear, другая сессия) забывает прошлые «печати».
+ */
+export function nextTyping(
+  prev: Record<string, number>, known: ChatItem[], e: { items: ChatItem[]; reset: boolean; prepend: boolean }, now: number,
+): Record<string, number> {
+  if (e.reset) return {};
+  if (e.prepend) return prev;
+  const ids = new Set(known.map((i) => i.id));
+  const out = { ...prev };
+  for (const i of e.items) if (i.kind === 'assistant' && !ids.has(i.id) && i.text.length <= TYPE_MAX_CHARS) out[i.id] = now;
+  return out;
+}
+
 /** Сообщение, показанное до записи в журнал: sending — отправляется, sent — Claude Code его принял. */
 export interface Pending {
   id: string;

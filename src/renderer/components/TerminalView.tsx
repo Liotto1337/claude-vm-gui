@@ -120,9 +120,18 @@ export function TerminalView({ name, hidden = false }: { name: string; hidden?: 
     if (termRef.current) termRef.current.options.theme = terminalTheme(theme);
   }, [theme]);
 
+  // Спрятан под ленту — фокус из терминала в поле ввода, иначе нажатия ушли бы в невидимый терминал.
   // Снова видим — подогнать размер и отдать фокус
   useEffect(() => {
-    if (hidden || !termRef.current) return;
+    if (hidden) {
+      const a = document.activeElement;
+      if (!a || a === document.body || host.current?.contains(a)) {
+        termRef.current?.blur();
+        document.getElementById('composer-input')?.focus();
+      }
+      return;
+    }
+    if (!termRef.current) return;
     fitRef.current?.fit();
     api.term.resize(termRef.current.cols, termRef.current.rows);
     termRef.current.focus();

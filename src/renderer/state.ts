@@ -3,7 +3,7 @@ import type {
   ChatItem, ConnectionState, ErrorCode, Hints, HostKeyPrompt, MetricsSample, PreflightEvent, PreflightStep, ScreenState,
   SidebarLayout, SystemInfo, TmuxSession, VmConfig,
 } from '@shared/ipc';
-import { claimPending, type Pending } from './chat-anim';
+import { claimPending, nextTyping, type Pending } from './chat-anim';
 import { mergeItems } from './view-mode';
 import { addNewToGroup, EMPTY, reconcile } from '@shared/layout';
 import { api } from './api';
@@ -166,12 +166,7 @@ export async function init(): Promise<void> {
   api.chat.onItems((e) =>
     patchChat(e.session, (c) => {
       const items = mergeItems(c.items, e);
-      // «Печатаются» только ответы, пришедшие сейчас; история при открытии и «Показать раньше» — сразу
-      const typing = { ...c.typing };
-      if (!e.reset && !e.prepend) {
-        const known = new Set(c.items.map((i) => i.id));
-        for (const i of e.items) if (i.kind === 'assistant' && !known.has(i.id)) typing[i.id] = performance.now();
-      }
+      const typing = nextTyping(c.typing, c.items, e, performance.now());
       return { items, typing, pending: claimPending(c.pending, items, Date.now(), c.busy), hasEarlier: e.hasEarlier, unavailable: null };
     }),
   );

@@ -267,3 +267,89 @@ test('ссылка из ответа открывается через links.ope
     await app.close();
   }
 });
+
+// Расстояние от низа ленты, px
+const fromBottom = (page: Page) => feed(page).evaluate((el) => el.scrollHeight - el.scrollTop - el.clientHeight);
+async function scrollable(l: Launched) {
+  await l.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1000, 560));
+  await expect(feed(l.page).getByText('Сейчас посмотрю.')).toBeVisible({ timeout: 15_000 });
+  await expect.poll(() => feed(l.page).evaluate((el) => el.scrollHeight > el.clientHeight + 200)).toBe(true);
+}
+
+test('ответ, дописанный во время «печати», допечатывается до конца', async () => {
+  const { app, page } = await open();
+  try {
+    await expect(feed(page).getByText('Сейчас посмотрю.')).toBeVisible({ timeout: 15_000 });
+    await composer(page).fill('grow');
+    await composer(page).press('Enter');
+    await expect(feed(page).locator('.md', { hasText: 'Начало растущего ответа' })).toContainText('Хвост растущего ответа.', { timeout: 6000 });
+  } finally {
+    await app.close();
+  }
+});
+
+test('отправка прокручивает ленту вниз, даже если она была прокручена вверх', async () => {
+  const l = await open();
+  try {
+    await scrollable(l);
+    await feed(l.page).evaluate((el) => (el.scrollTop = 0));
+    await expect.poll(() => fromBottom(l.page)).toBeGreaterThan(200);
+    await composer(l.page).fill('вниз');
+    await composer(l.page).press('Enter');
+    await expect.poll(() => fromBottom(l.page), { timeout: 2000 }).toBeLessThan(5);
+  } finally {
+    await l.app.close();
+  }
+});
+
+test('колесо вверх во время «печати» не возвращает ленту вниз', async () => {
+  const l = await open();
+  try {
+    await scrollable(l);
+    await composer(l.page).fill('long');
+    await composer(l.page).press('Enter');
+    await expect(feed(l.page).locator('.md', { hasText: 'Длинный ответ' })).toBeVisible({ timeout: 10_000 });
+    const b = (await feed(l.page).boundingBox())!;
+    await l.page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
+    await l.page.mouse.wheel(0, -30);
+    await expect(feed(l.page).locator('.md', { hasText: 'Длинный ответ' })).toContainText('Конец ответа.', { timeout: 5000 });
+    await l.page.waitForTimeout(300);
+    expect(await fromBottom(l.page)).toBeGreaterThan(20);
+  } finally {
+    await l.app.close();
+  }
+});
+
+test('после ответа в карточке меню фокус возвращается в поле ввода', async () => {
+  const { app, page } = await open();
+  try {
+    await expect(feed(page)).toBeVisible({ timeout: 15_000 });
+    await composer(page).fill('menu');
+    await composer(page).press('Enter');
+    const card = page.getByRole('group', { name: 'Выбор' });
+    await expect(card).toBeVisible({ timeout: 10_000 });
+    await expect(card).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(card).toBeHidden({ timeout: 5000 });
+    await expect(composer(page)).toBeFocused({ timeout: 3000 });
+  } finally {
+    await app.close();
+  }
+});
+
+test('claude запустили из терминала: лента вместо терминала, ввод — в поле, а не в скрытый терминал', async () => {
+  const { app, page } = await open('cvg-test-shell');
+  try {
+    const term = page.getByRole('region', { name: 'Терминал' });
+    await expect(term).toBeVisible({ timeout: 15_000 });
+    await term.click();
+    await page.keyboard.type(`CVG_CLAUDE_DIR=${claudeDir} node ${FAKE}`);
+    await page.keyboard.press('Enter');
+    await expect(feed(page)).toBeVisible({ timeout: 15_000 });
+    await expect(composer(page)).toBeFocused({ timeout: 3000 });
+    await page.keyboard.type('печатаю');
+    await expect(composer(page)).toHaveValue('печатаю');
+  } finally {
+    await app.close();
+  }
+});
