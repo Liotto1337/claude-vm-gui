@@ -1,7 +1,7 @@
 {
   "name": "claude-vm-gui",
   "productName": "Claude VM",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Windows-клиент для Claude Code на ВМ: SSH, tmux и интерфейс в стиле claude.ai",
   "author": "Liotto1337 <egorstep.0801@gmail.com>",
   "license": "MIT",
