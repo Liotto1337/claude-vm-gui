@@ -140,6 +140,7 @@
 .session-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; overflow: hidden; flex: 1; min-height: 0; }
 .session-list > li { flex: none; position: relative; box-sizing: border-box; }
 .row-session { height: 52px; padding: 1px 0; }
+.session-list > li[hidden] { display: none; }
 .row-session.in-group { padding-left: 14px; }
 .row-session.in-group .session-item { border-left: 0.5px solid var(--border); border-radius: 0 8px 8px 0; }
 .row-group { height: 34px; padding: 1px 0; }
@@ -343,3 +344,4 @@
 .procs th, .procs td { padding: 4px 8px; border: 0.5px solid var(--border); }
 .procs thead th { background: var(--sidebar); }
 .session-box:focus { outline: none; }
+.session-box:focus-visible { outline: 1px solid var(--accent); outline-offset: -1px; border-radius: 8px; }

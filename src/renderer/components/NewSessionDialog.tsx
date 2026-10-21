@@ -1,8 +1,7 @@
 import { useEffect, useId, useState, type FormEvent } from 'react';
 import { validateSessionName } from '@shared/quote';
 import { api } from '../api';
-import { moveToGroup } from '@shared/layout';
-import { createSession, updateLayout } from '../state';
+import { createSession } from '../state';
 
 /** group — новая сессия сразу попадает в эту группу (меню группы). */
 export function NewSessionDialog({ onClose, group }: { onClose: () => void; group?: string }) {
@@ -28,8 +27,7 @@ export function NewSessionDialog({ onClose, group }: { onClose: () => void; grou
     e.preventDefault();
     if (!nameOk || busy) return;
     setBusy(true);
-    const err = await createSession(name, dir, startClaude);
-    if (!err && group) updateLayout((l) => moveToGroup(l, name, group));
+    const err = await createSession(name, dir, startClaude, group);
     setBusy(false);
     if (err) setError(err);
     else onClose();

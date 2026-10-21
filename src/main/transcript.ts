@@ -149,7 +149,7 @@ export class TranscriptService extends EventEmitter {
     }
     if (gen !== this.gen) return ok(undefined);
     this.start = part.start;
-    const r = parseTranscriptLines(part.lines, this.st);
+    const r = parseTranscriptLines(part.lines, this.st, true);
     this.emit('items', { reset: false, prepend: true, items: r.changed, hasEarlier: this.start > 0 });
     return ok(undefined);
   }

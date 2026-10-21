@@ -188,7 +188,7 @@ export function SessionList({ onNewSession }: { onNewSession: (group?: string) =
   ];
   // ПКМ и Shift+F10 по пустому месту списка (не по сессии и не по группе)
   const onListContext = (e: MouseEvent) => {
-    if ((e.target as HTMLElement).closest('button, [role="menu"], [role="dialog"]')) return;
+    if ((e.target as HTMLElement).closest('button, [role="menu"], [role="dialog"], .overlay')) return;
     e.preventDefault();
     setMenu({ x: e.clientX, y: e.clientY, ref: 'list' });
   };
@@ -233,13 +233,14 @@ export function SessionList({ onNewSession }: { onNewSession: (group?: string) =
 
   // ── Строки ──
   const dropClass = (r: Row) => (drop && drop.key === rowKey(r) ? ` drop-${drop.edge}` : '');
-  const renderSession = (r: Extract<Row, { kind: 'session' }>, s: TmuxSession) => {
+  const renderSession = (r: Extract<Row, { kind: 'session' }>, s: TmuxSession, hidden: boolean) => {
     const pinned = whereIs(layout, s.name)?.pinned ?? false;
     const others = s.attachedClients - (current === s.name ? 1 : 0);
     const ref: ItemRef = { session: s.name };
     return (
       <li
         key={rowKey(r)}
+        hidden={hidden}
         className={`row-session${r.group ? ' in-group' : ''}${dropClass(r)}`}
         onDragOver={(e) => onDragOver(e, r)}
         onDrop={(e) => onDrop(e, r)}
@@ -267,13 +268,13 @@ export function SessionList({ onNewSession }: { onNewSession: (group?: string) =
       </li>
     );
   };
-  const renderGroup = (r: Extract<Row, { kind: 'group' }>) => {
+  const renderGroup = (r: Extract<Row, { kind: 'group' }>, pageNo: number, hidden: boolean) => {
     const g = groupById(layout, r.id);
     if (!g) return null;
     const count = g.sessions.filter((m) => live.has(m.name)).length;
     const ref: ItemRef = { group: g.id };
     return (
-      <li key={`${rowKey(r)}${r.continued ? ':c' : ''}`} className={`row-group${dropClass(r)}`} onDragOver={(e) => onDragOver(e, r)} onDrop={(e) => onDrop(e, r)}>
+      <li key={`${rowKey(r)}${r.continued ? `:c${pageNo}` : ''}`} hidden={hidden} className={`row-group${dropClass(r)}`} onDragOver={(e) => onDragOver(e, r)} onDrop={(e) => onDrop(e, r)}>
         <button
           type="button"
           className="group-header"
@@ -296,18 +297,23 @@ export function SessionList({ onNewSession }: { onNewSession: (group?: string) =
     );
   };
 
-  const shown = pages[pageIdx] ?? [];
   const menuRef = menu?.ref;
   return (
-    <div className="session-box" ref={box} tabIndex={-1} onContextMenu={onListContext} onKeyDown={onListKey}>
+    <div className="session-box" ref={box} tabIndex={0} role="group" aria-label="Список сессий (Shift+F10 — меню)"
+      onContextMenu={onListContext} onKeyDown={onListKey}>
       <ul className="session-list">
-        {shown.map((r, i) => {
-          if (r.kind === 'section') return <li key={`sec-${i}`} className="row-section caption">{r.label}</li>;
-          if (r.kind === 'divider') return <li key={`div-${i}`} className="row-divider" role="separator" />;
-          if (r.kind === 'group') return renderGroup(r);
-          const s = byName.get(r.name);
-          return s ? renderSession(r, s) : null;
-        })}
+        {/* Строки всех страниц в DOM, чужие страницы скрыты: при перелистывании во время перетаскивания
+            тащимая строка не исчезает, иначе Chromium обрывает перетаскивание и dragend не приходит */}
+        {pages.flatMap((p, pi) =>
+          p.map((r, i) => {
+            const hidden = pi !== pageIdx;
+            if (r.kind === 'section') return <li key={`sec-${pi}-${i}`} hidden={hidden} className="row-section caption">{r.label}</li>;
+            if (r.kind === 'divider') return <li key={`div-${pi}-${i}`} hidden={hidden} className="row-divider" role="separator" />;
+            if (r.kind === 'group') return renderGroup(r, pi, hidden);
+            const s = byName.get(r.name);
+            return s ? renderSession(r, s, hidden) : null;
+          }),
+        )}
       </ul>
       {pages.length > 1 ? (
         <div className="pager">

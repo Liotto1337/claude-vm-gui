@@ -5,7 +5,7 @@ import type {
 } from '@shared/ipc';
 import { claimPending, type Pending } from './chat-anim';
 import { mergeItems } from './view-mode';
-import { EMPTY, reconcile } from '@shared/layout';
+import { addNewToGroup, EMPTY, reconcile } from '@shared/layout';
 import { api } from './api';
 
 export type View = 'loading' | 'settings' | 'connect' | 'main';
@@ -227,9 +227,11 @@ export function openSession(name: string | null): void {
   }
 }
 
-export async function createSession(name: string, dir: string, startClaude: boolean): Promise<string | null> {
+/** group — сразу в эту группу: раскладка меняется до обновления списка, так сессия попадёт в группу и при его сбое. */
+export async function createSession(name: string, dir: string, startClaude: boolean, group?: string): Promise<string | null> {
   const r = await api.tmux.create(name, dir, startClaude);
   if (!r.ok) return r.error.message;
+  if (group) updateLayout((l) => addNewToGroup(l, name, group));
   await refreshSessions();
   openSession(name);
   return null;

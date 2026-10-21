@@ -34,7 +34,8 @@ async function open(): Promise<Launched> {
 }
 const nav = (page: Page) => page.getByRole('navigation', { name: 'Сессии' });
 const item = (page: Page, name: string) => nav(page).getByRole('button', { name: new RegExp(`^${name}\\b`) });
-const order = (page: Page) => nav(page).locator('.session-name').allTextContents();
+// Строки других страниц тоже в DOM (скрыты) — только видимые
+const order = (page: Page) => nav(page).locator('.session-name:visible').allTextContents();
 const menuItem = (page: Page, name: string) => page.getByRole('menuitem', { name });
 
 test('закрепить через ПКМ: булавка и место наверху', async () => {
@@ -212,6 +213,114 @@ test('ПКМ по пустому месту списка: новая групп�
     await page.getByRole('dialog', { name: 'Новая группа' }).getByLabel('Название группы').fill('Пустая');
     await page.getByRole('dialog', { name: 'Новая группа' }).getByRole('button', { name: 'Создать' }).click();
     await expect(nav(page).getByRole('button', { name: /^Группа Пустая, сессий: 0/ })).toBeVisible();
+  } finally {
+    await app.close();
+  }
+});
+
+test('новая сессия в свёрнутую группу: группа разворачивается, сессию видно', async () => {
+  const { app, page } = await open();
+  try {
+    await item(page, 'cvg-test-a').click({ button: 'right' });
+    await menuItem(page, 'Переместить в группу').click();
+    await menuItem(page, 'Новая группа…').click();
+    await page.getByRole('dialog', { name: 'Новая группа' }).getByLabel('Название группы').fill('Свёрнутая');
+    await page.getByRole('dialog', { name: 'Новая группа' }).getByRole('button', { name: 'Создать' }).click();
+    const group = nav(page).getByRole('button', { name: /^Группа Свёрнутая/ });
+    await group.click({ button: 'right' });
+    await menuItem(page, 'Свернуть').click();
+    await expect(group).toHaveAttribute('aria-expanded', 'false');
+    await group.click({ button: 'right' });
+    await menuItem(page, 'Новая сессия…').click();
+    const dialog = page.getByRole('dialog', { name: 'Новая сессия' });
+    await dialog.getByLabel('Имя сессии tmux').fill('cvg-test-fold');
+    await dialog.getByLabel('Сразу запустить claude').uncheck();
+    await dialog.getByRole('button', { name: 'Создать' }).click();
+    await expect(group).toHaveAttribute('aria-expanded', 'true', { timeout: 10_000 });
+    await expect(nav(page).locator('li.in-group', { hasText: 'cvg-test-fold' })).toBeVisible();
+  } finally {
+    await app.close();
+  }
+});
+
+test('ПКМ по затемнённому фону диалога не открывает меню списка', async () => {
+  const { app, page } = await open();
+  try {
+    const box = nav(page).locator('.session-box');
+    const b = (await box.boundingBox())!;
+    await box.click({ button: 'right', position: { x: b.width / 2, y: b.height - 20 } });
+    await menuItem(page, 'Новая группа…').click();
+    await expect(page.getByRole('dialog', { name: 'Новая группа' })).toBeVisible();
+    await page.mouse.click(8, 8, { button: 'right' });
+    await expect(page.getByRole('menu', { name: 'Список сессий' })).toHaveCount(0);
+    await expect(page.getByRole('dialog', { name: 'Новая группа' })).toBeVisible();
+  } finally {
+    await app.close();
+  }
+});
+
+test('меню пустого места с клавиатуры: Tab до списка и Shift+F10', async () => {
+  const { app, page } = await open();
+  try {
+    const box = nav(page).locator('.session-box');
+    for (let i = 0; i < 30; i++) {
+      if (await box.evaluate((el) => el === document.activeElement)) break;
+      await page.keyboard.press('Tab');
+    }
+    await expect(box).toBeFocused();
+    await page.keyboard.press('Shift+F10');
+    await expect(page.getByRole('menu', { name: 'Список сессий' })).toBeVisible();
+    await expect(menuItem(page, 'Новая группа…')).toBeVisible();
+  } finally {
+    await app.close();
+  }
+});
+
+test('перетаскивание с перелистыванием: отпустили мимо строк — линии вставки не остаётся', async () => {
+  for (let i = 0; i < 10; i++) tmux('new-session', '-d', '-s', `cvg-test-z${i}`);
+  const { app, page } = await open();
+  try {
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1000, 600));
+    await expect(nav(page).getByText(/^1 \/ \d$/)).toBeVisible();
+    const src = nav(page).locator('.session-item:visible').first();
+    const s = (await src.boundingBox())!;
+    await page.mouse.move(s.x + 20, s.y + 10);
+    await page.mouse.down();
+    await page.mouse.move(s.x + 30, s.y + 20, { steps: 5 });
+    const next = (await nav(page).getByRole('button', { name: 'Следующая страница' }).boundingBox())!;
+    await page.mouse.move(next.x + next.width / 2, next.y + next.height / 2, { steps: 10 });
+    await expect(nav(page).getByText(/^2 \/ \d$/)).toBeVisible({ timeout: 3000 });
+    const row = (await nav(page).locator('.session-item:visible').first().boundingBox())!;
+    await page.mouse.move(row.x + 20, row.y + 4, { steps: 10 });
+    await expect(nav(page).locator('.drop-before, .drop-after')).toHaveCount(1);
+    const label = (await nav(page).getByText(/^2 \/ \d$/).boundingBox())!;
+    await page.mouse.move(label.x + 2, label.y + 2, { steps: 10 });
+    await page.mouse.up();
+    await expect(nav(page).locator('.drop-before, .drop-after')).toHaveCount(0);
+  } finally {
+    await app.close();
+  }
+});
+
+test('перетаскивание на другую страницу переносит сессию', async () => {
+  for (let i = 0; i < 10; i++) tmux('new-session', '-d', '-s', `cvg-test-z${i}`);
+  const { app, page } = await open();
+  try {
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1000, 600));
+    await expect(nav(page).getByText(/^1 \/ \d$/)).toBeVisible();
+    const name = (await order(page))[0];
+    const s = (await nav(page).locator('.session-item:visible').first().boundingBox())!;
+    await page.mouse.move(s.x + 20, s.y + 10);
+    await page.mouse.down();
+    await page.mouse.move(s.x + 30, s.y + 20, { steps: 5 });
+    const next = (await nav(page).getByRole('button', { name: 'Следующая страница' }).boundingBox())!;
+    await page.mouse.move(next.x + next.width / 2, next.y + next.height / 2, { steps: 10 });
+    await expect(nav(page).getByText(/^2 \/ \d$/)).toBeVisible({ timeout: 3000 });
+    const row = (await nav(page).locator('.session-item:visible').nth(1).boundingBox())!;
+    await page.mouse.move(row.x + 20, row.y + 40, { steps: 10 });
+    await page.mouse.up();
+    await expect(nav(page).locator('.drop-before, .drop-after')).toHaveCount(0);
+    await expect.poll(() => order(page)).toContain(name);
   } finally {
     await app.close();
   }

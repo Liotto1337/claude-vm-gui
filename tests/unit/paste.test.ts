@@ -37,4 +37,9 @@ describe('keyBytes', () => {
   it('цифра', () => expect(keyBytes('7')).toBe('7'));
   it('неизвестная клавиша — ошибка', () => expect(() => keyBytes('rm -rf' as never)).toThrow());
   it('0 не из списка', () => expect(() => keyBytes('0' as never)).toThrow());
+  it('не строка — ошибка, даже если toString похож на клавишу', () => {
+    expect(() => keyBytes({ toString: () => '1' } as never)).toThrow();
+    expect(() => keyBytes({ toString: () => 'enter' } as never)).toThrow();
+    expect(() => keyBytes(['2'] as never)).toThrow();
+  });
 });

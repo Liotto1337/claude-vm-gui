@@ -29,6 +29,7 @@ const KEYS: Record<string, string> = {
 
 /** Байты клавиши для терминала. Только белый список: стрелки, Enter, Esc, Tab, Shift+Tab, цифры 1–9. */
 export function keyBytes(k: MenuKey): string {
+  if (typeof k !== 'string') throw new Error('Недопустимая клавиша');
   if (Object.hasOwn(KEYS, k)) return KEYS[k];
   if (/^[1-9]$/.test(k)) return k;
   throw new Error(`Недопустимая клавиша: ${String(k)}`);

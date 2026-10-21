@@ -93,3 +93,48 @@ describe('parseTranscriptLines', () => {
     expect(parseAll([line]).changed[0]).toMatchObject({ text: 'глянь пожалуйста', images: 1 });
   });
 });
+
+describe('субагенты и подгрузка ранней части', () => {
+  const j = (o: object) => JSON.stringify(o);
+  const task = (uuid: string, id: string, prompt: string) =>
+    j({ type: 'assistant', uuid, message: { content: [{ type: 'tool_use', id, name: 'Task', input: { description: prompt, prompt } }] } });
+  const sideUser = (uuid: string, text: string, parentUuid: string | null = null) =>
+    j({ type: 'user', uuid, parentUuid, isSidechain: true, message: { content: text } });
+  const sideTool = (uuid: string, parentUuid: string, id: string, pattern: string) =>
+    j({ type: 'assistant', uuid, parentUuid, isSidechain: true, message: { content: [{ type: 'tool_use', id, name: 'Grep', input: { pattern } }] } });
+  const children = (st: ReturnType<typeof newParseState>, id: string) => (st.items.get(id) as Tool).children.map((c) => (c.kind === 'tool' ? c.summary : c.kind));
+
+  it('ранняя часть журнала не перехватывает действия живого субагента', () => {
+    const st = newParseState();
+    parseTranscriptLines([task('a2', 'toolu_live', 'живой')], st);
+    // «Показать раньше»: в ранней части — свой, давно завершённый Task
+    parseTranscriptLines([task('a1', 'toolu_old', 'старый')], st, true);
+    parseTranscriptLines([sideTool('s1', 'x', 'toolu_g', 'после')], st);
+    expect(children(st, 'toolu_live')).toEqual(['после']);
+    expect(children(st, 'toolu_old')).toEqual([]);
+  });
+
+  it('параллельные Task: действия по цепочке parentUuid попадают к своему', () => {
+    const st = newParseState();
+    parseTranscriptLines([
+      task('a1', 'toolu_A', 'искать A'),
+      task('a2', 'toolu_B', 'искать B'),
+      sideUser('sa0', 'искать A'),
+      sideUser('sb0', 'искать B'),
+      sideTool('sa1', 'sa0', 'toolu_ga', 'A1'),
+      sideTool('sb1', 'sb0', 'toolu_gb', 'B1'),
+      sideTool('sa2', 'sa1', 'toolu_ga2', 'A2'),
+    ], st);
+    expect(children(st, 'toolu_A')).toEqual(['A1', 'A2']);
+    expect(children(st, 'toolu_B')).toEqual(['B1']);
+  });
+
+  it('запасные id записей без uuid не совпадают после подгрузки ранней части', () => {
+    const st = newParseState();
+    const noUuid = (text: string) => j({ type: 'user', message: { content: text } });
+    const live = parseTranscriptLines([noUuid('позже')], st).changed;
+    const early = parseTranscriptLines([noUuid('раньше')], st, true).changed;
+    expect(live[0].id).not.toBe(early[0].id);
+    expect([...st.items.values()].map((i) => (i.kind === 'user' ? i.text : ''))).toEqual(['позже', 'раньше']);
+  });
+});

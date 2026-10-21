@@ -1,5 +1,6 @@
 import { app, clipboard, ipcMain, nativeTheme, safeStorage, shell, type BrowserWindow } from 'electron';
 import type { Result, SidebarLayout, VmConfig } from '@shared/ipc';
+import { externalUrl } from '@shared/links';
 import { loadConfig, loadPassword, saveConfig, type SecretBox } from './config';
 import { LayoutStore } from './layout-store';
 
@@ -54,8 +55,9 @@ export class IpcHub {
       saveConfig(this.paths.userDataDir, c, typeof password === 'string' || password === null ? password : undefined, safeBox),
     );
     // Ссылки из ленты — только http(s), в браузере; в E2E (CVG_TEST_HOOKS) только запоминаются
-    this.listen('links:open', (url: string) => {
-      if (typeof url !== 'string' || !/^https?:\/\//i.test(url)) return;
+    this.listen('links:open', (raw: unknown) => {
+      const url = externalUrl(raw);
+      if (!url) return;
       if (process.env.CVG_TEST_HOOKS === '1') {
         const g = globalThis as unknown as { __cvg?: Record<string, unknown> };
         g.__cvg = Object.assign(g.__cvg ?? {}, { lastLink: url });

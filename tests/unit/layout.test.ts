@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { LayoutItem, SidebarLayout } from '../../src/shared/ipc';
 import {
-  createGroup, deleteGroup, move, moveToGroup, normalize, paginate, reconcile, removeFromGroup, renameGroup, rowsOf,
+  addNewToGroup, createGroup, deleteGroup, move, moveToGroup, normalize, paginate, reconcile, removeFromGroup, renameGroup, rowsOf,
   toggleCollapsed, togglePin, validGroupName, type Row,
 } from '../../src/shared/layout';
 
@@ -79,6 +79,24 @@ describe('группы', () => {
     expect(n(deleteGroup(L([s('a'), g('g1', ['x', 'y']), s('b')]), 'g1'))).toEqual(['a', 'x', 'y', 'b']));
   it('deleteGroup закреплённой группы: сессии закреплены', () =>
     expect(n(deleteGroup(L([g('g1', ['x'], { pinned: true }), s('b')]), 'g1'))).toEqual(['*x', 'b']));
+  it('addNewToGroup: сессии ещё нет в раскладке — встаёт в группу', () =>
+    expect(n(addNewToGroup(L([s('a'), g('g1', ['x'])]), 'new', 'g1'))).toEqual(['a', '#g1[new,x]']));
+  it('addNewToGroup: уже на верхнем уровне — переносится', () =>
+    expect(n(addNewToGroup(L([s('new'), g('g1', [])]), 'new', 'g1'))).toEqual(['#g1[new]']));
+  it('addNewToGroup: свёрнутая группа разворачивается', () =>
+    expect(addNewToGroup(L([g('g1', [], { collapsed: true })]), 'new', 'g1').items[0]).not.toHaveProperty('collapsed'));
+  it('addNewToGroup: уже в этой свёрнутой группе — исходная раскладка не меняется на месте', () => {
+    const l = L([g('g1', ['new'], { collapsed: true })]);
+    const out = addNewToGroup(l, 'new', 'g1');
+    expect(out.items[0]).not.toHaveProperty('collapsed');
+    expect(l.items[0]).toHaveProperty('collapsed', true);
+  });
+  it('addNewToGroup: группы нет — раскладка не меняется', () => {
+    const l = L([s('a')]);
+    expect(addNewToGroup(l, 'new', 'nope')).toBe(l);
+  });
+  it('addNewToGroup: потом reconcile с живой сессией её не трогает', () =>
+    expect(n(reconcile(addNewToGroup(L([g('g1', [])]), 'new', 'g1'), ['new']))).toEqual(['#g1[new]']));
   it('toggleCollapsed', () => expect(toggleCollapsed(L([g('g1', [])]), 'g1').items[0]).toMatchObject({ collapsed: true }));
   it('moveToGroup: первой среди незакреплённых группы', () =>
     expect(n(moveToGroup(L([s('a'), g('g1', ['x'], { sessions: [{ name: 'p', pinned: true }, { name: 'x' }] })]), 'a', 'g1'))).toEqual(['#g1[*p,a,x]']));

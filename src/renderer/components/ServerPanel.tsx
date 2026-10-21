@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { formatBytes, formatRate, formatUptime } from '@shared/metrics-parse';
+import { plural } from '@shared/plural';
 import { setServerOpen, useAppState } from '../state';
 import { IconClose } from './icons';
 import { Sparkline } from './Sparkline';
@@ -61,7 +62,7 @@ export function ServerPanel() {
           <dt>Работает</dt>
           <dd>{last?.uptimeSec != null ? formatUptime(last.uptimeSec) : '—'}</dd>
           <dt>CPU</dt>
-          <dd>{systemInfo ? `${systemInfo.cores} ${systemInfo.cores === 1 ? 'ядро' : systemInfo.cores < 5 ? 'ядра' : 'ядер'}` : '—'}</dd>
+          <dd>{systemInfo ? `${systemInfo.cores} ${plural(systemInfo.cores, 'ядро', 'ядра', 'ядер')}` : '—'}</dd>
           <dt>Claude Code</dt>
           <dd>{systemInfo?.claudeVersion ?? '—'}</dd>
         </dl>

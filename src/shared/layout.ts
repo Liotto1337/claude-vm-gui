@@ -194,6 +194,20 @@ export function moveToGroup(l: SidebarLayout, session: string, id: string): Side
   return move(l, { session }, { group: id, index: pinnedCount(g.sessions) });
 }
 
+/**
+ * Только что созданная сессия — в группу, даже если список tmux её ещё не принёс (тогда её нет в раскладке).
+ * Свёрнутая группа разворачивается, чтобы новую сессию было видно.
+ */
+export function addNewToGroup(l: SidebarLayout, session: string, id: string): SidebarLayout {
+  if (!findGroup(l, id)) return l;
+  const base = clone(l);
+  const out = locate(base, session) ? moveToGroup(base, session, id) : base;
+  const g = findGroup(out, id)!;
+  if (!locate(out, session)) g.sessions.splice(pinnedCount(g.sessions), 0, { name: session });
+  delete g.collapsed;
+  return out;
+}
+
 /** Из группы — на верхний уровень, первой среди незакреплённых. */
 export function removeFromGroup(l: SidebarLayout, session: string): SidebarLayout {
   const at = locate(l, session);

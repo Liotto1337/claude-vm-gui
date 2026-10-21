@@ -2,6 +2,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { fail, ok, type HostKeyPrompt, type ImageExt, type MenuKey, type Result } from '@shared/ipc';
 import { transcriptPath } from '@shared/claude-session';
+import { plural } from '@shared/plural';
 import { HintsService } from './hints';
 import { MetricsService } from './metrics';
 import { SessionWatcher } from './session-watch';
@@ -11,12 +12,6 @@ import { SshConnection } from './ssh';
 import { TerminalService } from './terminal';
 import { TmuxService } from './tmux';
 import { UploadService } from './upload';
-
-const plural = (n: number, one: string, few: string, many: string) => {
-  const n10 = n % 10;
-  const n100 = n % 100;
-  return n10 === 1 && n100 !== 11 ? one : n10 >= 2 && n10 <= 4 && (n100 < 12 || n100 > 14) ? few : many;
-};
 
 interface Services {
   conn: SshConnection;

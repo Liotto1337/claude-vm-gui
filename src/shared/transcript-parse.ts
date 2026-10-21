@@ -14,14 +14,18 @@ export interface ParseState {
   toolOwner: Map<string, string>;
   /** Результаты, пришедшие раньше вызова (подгрузка ранней части журнала) */
   orphanResults: Map<string, { text: string; error: boolean }>;
-  /** Последний Task/Agent: к нему крепятся действия субагента */
+  /** Последний Task/Agent: к нему крепятся действия субагента, если цепочка parentUuid не нашла свой */
   activeTask: string | null;
+  /** Незавершённые Task/Agent: текст задания → id (первое сообщение субагента — это задание) */
+  taskPrompts: Map<string, string>;
+  /** uuid записи субагента → id его Task */
+  sideOwner: Map<string, string>;
   /** Битых строк подряд */
   badStreak: number;
 }
 
 export const newParseState = (): ParseState => ({
-  items: new Map(), toolOwner: new Map(), orphanResults: new Map(), activeTask: null, badStreak: 0,
+  items: new Map(), toolOwner: new Map(), orphanResults: new Map(), activeTask: null, taskPrompts: new Map(), sideOwner: new Map(), badStreak: 0,
 });
 
 const MAX_RESULT_LINES = 200;
@@ -110,8 +114,19 @@ function special(id: string, text: string): ChatItem | null | 'skip' {
 /**
  * Разбирает строки журнала. Возвращает изменённые элементы верхнего уровня в порядке появления
  * (новые и дополненные — например, вызов получил результат) и число битых строк.
+ * earlier — ранняя часть журнала («Показать раньше»): её Task не становится текущим для живых записей.
  */
-export function parseTranscriptLines(lines: string[], st: ParseState): { changed: ChatItem[]; bad: number } {
+export function parseTranscriptLines(lines: string[], st: ParseState, earlier = false): { changed: ChatItem[]; bad: number } {
+  const live = st.activeTask;
+  if (earlier) st.activeTask = null;
+  try {
+    return parseLines(lines, st);
+  } finally {
+    if (earlier) st.activeTask = live;
+  }
+}
+
+function parseLines(lines: string[], st: ParseState): { changed: ChatItem[]; bad: number } {
   const changed = new Map<string, ChatItem>();
   let bad = 0;
   const put = (item: ChatItem) => {
@@ -124,7 +139,16 @@ export function parseTranscriptLines(lines: string[], st: ParseState): { changed
     if (it && !changed.has(id)) changed.set(id, it);
   };
 
-  const addTool = (b: Block, sidechain: boolean) => {
+  // Task субагента: по цепочке parentUuid, иначе — последний запущенный
+  const ownerOf = (rec: Record<string, unknown>): Tool | undefined => {
+    const uuid = typeof rec.uuid === 'string' ? rec.uuid : null;
+    const parent = typeof rec.parentUuid === 'string' ? st.sideOwner.get(rec.parentUuid) : undefined;
+    const id = parent ?? st.activeTask;
+    if (uuid && id) st.sideOwner.set(uuid, id);
+    return id ? (st.items.get(id) as Tool | undefined) : undefined;
+  };
+
+  const addTool = (b: Block, owner: Tool | undefined) => {
     if (!b.id || !b.name) return;
     const orphan = st.orphanResults.get(b.id);
     st.orphanResults.delete(b.id);
@@ -132,7 +156,6 @@ export function parseTranscriptLines(lines: string[], st: ParseState): { changed
       kind: 'tool', id: b.id, name: b.name, summary: summarize(b.name, b.input), input: inputText(b.input),
       status: orphan ? (orphan.error ? 'error' : 'ok') : 'running', result: orphan ? orphan.text : null, children: [],
     };
-    const owner = sidechain && st.activeTask ? (st.items.get(st.activeTask) as Tool | undefined) : undefined;
     if (owner) {
       owner.children = [...owner.children, t];
       st.toolOwner.set(b.id, owner.id);
@@ -140,7 +163,11 @@ export function parseTranscriptLines(lines: string[], st: ParseState): { changed
     } else {
       st.toolOwner.set(b.id, b.id);
       put(t);
-      if (b.name === 'Task' || b.name === 'Agent') st.activeTask = b.id;
+      if (b.name === 'Task' || b.name === 'Agent') {
+        st.activeTask = b.id;
+        const prompt = (b.input as { prompt?: unknown } | undefined)?.prompt;
+        if (typeof prompt === 'string') st.taskPrompts.set(prompt.trim(), b.id);
+      }
     }
   };
 
@@ -156,6 +183,7 @@ export function parseTranscriptLines(lines: string[], st: ParseState): { changed
       owner.status = error ? 'error' : 'ok';
       owner.result = text;
       if (st.activeTask === owner.id) st.activeTask = null;
+      for (const [p, id] of st.taskPrompts) if (id === owner.id) st.taskPrompts.delete(p);
     } else {
       owner.children = owner.children.map((c) =>
         c.kind === 'tool' && c.id === b.tool_use_id ? { ...c, status: error ? 'error' : 'ok', result: text } : c,
@@ -191,7 +219,13 @@ export function parseTranscriptLines(lines: string[], st: ParseState): { changed
 
     if (rec.type === 'user') {
       if (typeof content === 'string') {
-        if (sidechain) continue; // задание субагенту — видно в строке Task
+        if (sidechain) {
+          // задание субагенту — видно в строке Task; по нему находим, чей это субагент
+          const task = st.taskPrompts.get(content.trim());
+          if (task && typeof rec.uuid === 'string') st.sideOwner.set(rec.uuid, task);
+          else ownerOf(rec);
+          continue;
+        }
         const sp = special(id, content);
         if (sp === 'skip') continue;
         if (sp) {
@@ -205,7 +239,10 @@ export function parseTranscriptLines(lines: string[], st: ParseState): { changed
       if (!Array.isArray(content)) continue;
       const blocks = content as Block[];
       for (const b of blocks) if (b.type === 'tool_result') addResult(b);
-      if (sidechain) continue;
+      if (sidechain) {
+        ownerOf(rec);
+        continue;
+      }
       const texts = blocks.filter((b) => b.type === 'text').map((b) => b.text ?? '');
       const images = blocks.filter((b) => b.type === 'image').length;
       if (texts.length === 0 && images === 0) continue;
@@ -223,11 +260,11 @@ export function parseTranscriptLines(lines: string[], st: ParseState): { changed
 
     // assistant
     if (!Array.isArray(content)) continue;
+    const owner = sidechain ? ownerOf(rec) : undefined;
     (content as Block[]).forEach((b, i) => {
-      if (b.type === 'tool_use') return addTool(b, sidechain);
+      if (b.type === 'tool_use') return addTool(b, owner);
       if (sidechain) {
-        if (b.type === 'text' && b.text?.trim() && st.activeTask) {
-          const owner = st.items.get(st.activeTask) as Tool | undefined;
+        if (b.type === 'text' && b.text?.trim()) {
           if (owner) {
             owner.children = [...owner.children, { kind: 'assistant', id: `${id}:${i}`, text: b.text }];
             touch(owner.id);
