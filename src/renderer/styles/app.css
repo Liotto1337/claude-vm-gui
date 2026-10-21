@@ -327,9 +327,10 @@
 .swap-label { width: 40px; flex: none; }
 .disk { display: flex; flex-direction: column; gap: 4px; }
 .procs { width: 100%; border-collapse: collapse; font-size: 12px; }
-.procs th { text-align: left; font-weight: 400; color: var(--text-2); padding: 2px 0; }
+.procs th, .procs td { padding: 4px 8px; border: 0.5px solid var(--border); }
+.procs th { text-align: left; font-weight: 400; color: var(--text-2); }
+.procs thead th { background: var(--sidebar); }
 .procs th:not(:first-child), .procs td:not(:first-child) { text-align: right; }
-.procs td { padding: 3px 0; }
 
 .menu-layer { position: absolute; left: 24px; right: 24px; bottom: 100%; z-index: 8; display: flex; justify-content: center; padding-bottom: 4px; pointer-events: none; }
 .menu-layer .menu-card { pointer-events: auto; max-height: min(60vh, 520px); overflow-y: auto; }
@@ -340,8 +341,5 @@
 [data-theme='dark'] .bubble.is-sending { background: color-mix(in srgb, var(--bubble) 35%, var(--bg)); color: var(--text-2); }
 .spinner { display: inline-block; width: 1em; text-align: center; color: var(--accent); }
 .session-header .btn-kill { color: var(--danger); }
-.procs { border-collapse: collapse; }
-.procs th, .procs td { padding: 4px 8px; border: 0.5px solid var(--border); }
-.procs thead th { background: var(--sidebar); }
 .session-box:focus { outline: none; }
 .session-box:focus-visible { outline: 1px solid var(--accent); outline-offset: -1px; border-radius: 8px; }
