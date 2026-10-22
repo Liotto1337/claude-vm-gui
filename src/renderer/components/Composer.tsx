@@ -126,7 +126,7 @@ export function Composer({ session, menu = null, working = false, chatMode = fal
     setBusy(true);
     // Сообщение сразу в ленте (темнее), а поле — сразу пустое: можно набирать следующее, пока идёт отправка
     const sent = getDraft(session.name);
-    const pendingId = addPending(session.name, text.trim(), ready.length);
+    const pendingId = addPending(session.name, text.trim(), ready.map((a) => a.remotePath!));
     setDraft(session.name, { text: '', attachments: [] });
     setTextAndCaret('', 0);
     const r = await api.term.send(sent.text, ready.map((a) => a.remotePath!)).finally(() => {

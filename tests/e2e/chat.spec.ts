@@ -1,7 +1,7 @@
 /// <reference lib="dom" />
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import { hasTestKey, launchApp, TEST_KEY, trustedKnownHosts, withConfig, type Launched } from './helpers';
@@ -381,8 +381,9 @@ test('поле пустеет сразу при отправке; следующ
     await expect(feed(page)).toBeVisible({ timeout: 15_000 });
     await composer(page).fill('уходит сразу');
     await composer(page).press('Enter');
-    await expect(composer(page)).toHaveValue('', { timeout: 300 });
-    await expect(feed(page).locator('.bubble.is-sending', { hasText: 'уходит сразу' })).toBeVisible();
+    // Claude Code примет сообщение не раньше чем через 1,2 с (CVG_FAKE_SLOW_ACCEPT) — поле пусто раньше, пузырь ещё «отправляется»
+    await expect(composer(page)).toHaveValue('', { timeout: 1000 });
+    await expect(feed(page).locator('.bubble.is-sending', { hasText: 'уходит сразу' })).toBeVisible({ timeout: 100 });
     await composer(page).fill('следующее');
     await expect(page.getByRole('button', { name: 'Отправить' })).toBeDisabled();
     await expect(page.getByRole('button', { name: 'Отправить' })).toBeEnabled({ timeout: 10_000 });
@@ -404,5 +405,38 @@ test('в режиме «Терминал» поля ввода нет, черн�
     await expect(composer(page)).toHaveValue('черновик');
   } finally {
     await app.close();
+  }
+});
+
+test('вложения в ленте: картинка целиком, текстовый файл раскрывается, картинка — на весь экран', async () => {
+  const UPLOADS = join(homedir(), '.cache/claude-vm-gui/uploads');
+  const before = new Set(existsSync(UPLOADS) ? readdirSync(UPLOADS) : []);
+  const { app, page } = await open();
+  try {
+    await expect(feed(page)).toBeVisible({ timeout: 15_000 });
+    const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+    await page.locator('input[type=file]').setInputFiles([
+      { name: 'pic.png', mimeType: 'image/png', buffer: PNG },
+      { name: 'a.txt', mimeType: 'text/plain', buffer: Buffer.from('hello') },
+    ]);
+    await expect(page.locator('.chip', { hasText: 'загружено' })).toHaveCount(2, { timeout: 15_000 });
+    await composer(page).fill('вложения');
+    await composer(page).press('Enter');
+    const bubble = feed(page).locator('.bubble:not(.is-sending)', { hasText: 'вложения' });
+    await expect(bubble).toBeVisible({ timeout: 15_000 });
+    const img = bubble.locator('img.chat-image');
+    await expect(img).toBeVisible();
+    expect(await img.evaluate((el) => (el as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+    const row = bubble.getByRole('button', { name: /a\.txt/ });
+    await expect(row).toContainText('5 Б', { timeout: 10_000 });
+    await row.click();
+    await expect(bubble.locator('pre', { hasText: 'hello' })).toBeVisible();
+    await img.click();
+    await expect(page.locator('.lightbox')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.lightbox')).toHaveCount(0);
+  } finally {
+    await app.close();
+    if (existsSync(UPLOADS)) for (const f of readdirSync(UPLOADS)) if (!before.has(f)) rmSync(join(UPLOADS, f));
   }
 });

@@ -78,6 +78,7 @@ export class AppController {
     h.handle('hints:get', (cwd: string) => this.need((s) => s.hints.get(cwd)));
     h.handle('hints:files', (cwd: string) => this.need((s) => s.hints.files(cwd)));
     h.handle('hints:dirs', (partial: string) => this.need((s) => s.hints.dirs(partial)));
+    h.handle('upload:read', (path: string, maxBytes: number) => this.need((s) => s.upload.read(path, maxBytes)));
     h.handle('upload:file', (id: string, bytes: Uint8Array, name: string) => this.need((s) => s.upload.file(id, bytes, name)));
   }
 

@@ -18,7 +18,7 @@ describe('viewMode', () => {
 });
 
 describe('mergeItems', () => {
-  const u = (id: string, text = id): ChatItem => ({ kind: 'user', id, text, images: 0 });
+  const u = (id: string, text = id): ChatItem => ({ kind: 'user', id, text, images: [], files: [] });
   const ev = (items: ChatItem[], patch: Partial<ChatEvent> = {}): ChatEvent => ({ session: 's', reset: false, prepend: false, items, hasEarlier: false, ...patch });
   it('upsert по id: обновление на месте, новые в конец', () =>
     expect(mergeItems([u('a'), u('b')], ev([u('a', 'A'), u('c')]))).toEqual([u('a', 'A'), u('b'), u('c')]));

@@ -49,7 +49,7 @@ const api: Api = {
     setEffort: invoke('term:setEffort'),
   } as Api['term'],
   hints: { get: invoke('hints:get'), files: invoke('hints:files'), dirs: invoke('hints:dirs') } as Api['hints'],
-  upload: { file: invoke('upload:file'), onProgress: on('upload:progress') } as Api['upload'],
+  upload: { file: invoke('upload:file'), onProgress: on('upload:progress'), read: invoke('upload:read') } as Api['upload'],
   clipboard: { read: invoke('clipboard:read'), write: send('clipboard:write') } as Api['clipboard'],
   layout: { get: invoke('layout:get'), save: invoke('layout:save') } as Api['layout'],
   links: { open: send('links:open') } as Api['links'],

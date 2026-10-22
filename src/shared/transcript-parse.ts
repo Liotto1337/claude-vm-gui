@@ -1,11 +1,21 @@
-import type { ChatItem } from './ipc';
+import { UPLOAD_DIR_MARK } from './upload-name';
+import type { ChatImage, ChatItem } from './ipc';
 import { stripAnsi } from './screen-parse';
 
 // Разбор журнала Claude Code (~/.claude/projects/…/<sessionId>.jsonl) в элементы ленты.
 // Формат внутренний и без гарантий: неизвестное пропускается, битые строки считаются.
 
 type Tool = Extract<ChatItem, { kind: 'tool' }>;
-type Block = { type?: string; text?: string; thinking?: string; id?: string; name?: string; input?: unknown; tool_use_id?: string; content?: unknown; is_error?: boolean };
+type Block = {
+  type?: string; text?: string; thinking?: string; id?: string; name?: string; input?: unknown; tool_use_id?: string; content?: unknown; is_error?: boolean;
+  source?: { type?: string; media_type?: string; data?: string };
+};
+
+/** Картинка из блока image (Claude Code кладёт туда отправленную картинку вместо пути к файлу). */
+const imageOf = (b: Block): ChatImage =>
+  b.source?.type === 'base64' && typeof b.source.data === 'string' && typeof b.source.media_type === 'string'
+    ? { mediaType: b.source.media_type, data: b.source.data }
+    : { mediaType: '', data: '' };
 
 export interface ParseState {
   /** Элементы верхнего уровня по id */
@@ -31,22 +41,20 @@ export const newParseState = (): ParseState => ({
 const MAX_RESULT_LINES = 200;
 const MAX_RESULT_CHARS = 20_000;
 const MAX_INPUT = 4000;
-const UPLOAD_DIR = '/claude-vm-gui/uploads/';
-const IMAGE_EXT = /\.(?:png|jpe?g|gif|webp)$/i;
-
 /**
- * Пути к картинкам из uploads убираются из текста и считаются. Разбор по словам, без регулярки
- * с \S* — на длинных строках без пробелов (base64) она уходила в квадратичный перебор.
+ * Пути к файлам из uploads убираются из текста и возвращаются списком (вложения сообщения). Разбор по словам,
+ * без регулярки с \S* — на длинных строках без пробелов (base64) она уходила в квадратичный перебор.
  */
-function stripUploads(text: string): { text: string; images: number } {
-  if (!text.includes(UPLOAD_DIR)) return { text, images: 0 };
-  let images = 0;
+function stripUploads(text: string): { text: string; files: string[] } {
+  if (!text.includes(UPLOAD_DIR_MARK)) return { text, files: [] };
+  const files: string[] = [];
   const kept = text.split(/(\s+)/).filter((tok) => {
-    const hit = tok.includes(UPLOAD_DIR) && IMAGE_EXT.test(tok);
-    if (hit) images++;
+    const at = tok.indexOf(UPLOAD_DIR_MARK);
+    const hit = at >= 0 && tok.length > at + UPLOAD_DIR_MARK.length;
+    if (hit) files.push(tok);
     return !hit;
   });
-  return { text: kept.join('').replace(/[ \t]{2,}/g, ' '), images };
+  return { text: kept.join('').replace(/[ \t]{2,}/g, ' '), files };
 }
 
 const PASTED_OPEN = '<pasted_content';
@@ -131,12 +139,12 @@ function special(id: string, text: string): ChatItem | null | 'skip' {
   const cmd = tag(text, 'command-name');
   if (cmd !== null) {
     const args = (tag(text, 'command-args') ?? '').trim();
-    return { kind: 'user', id, text: `${cmd.trim()}${args ? ` ${args}` : ''}`, images: 0 };
+    return { kind: 'user', id, text: `${cmd.trim()}${args ? ` ${args}` : ''}`, images: [], files: [] };
   }
   const out = tag(text, 'local-command-stdout');
   if (out !== null) return out.trim() ? { kind: 'note', id, text: stripAnsi(out).trim() } : 'skip';
   const bash = tag(text, 'bash-input');
-  if (bash !== null) return { kind: 'user', id, text: `! ${bash.trim()}`, images: 0 };
+  if (bash !== null) return { kind: 'user', id, text: `! ${bash.trim()}`, images: [], files: [] };
   const stdout = tag(text, 'bash-stdout');
   if (stdout !== null) {
     const err = tag(text, 'bash-stderr') ?? '';
@@ -272,7 +280,7 @@ function parseLines(lines: string[], st: ParseState): { changed: ChatItem[]; bad
           continue;
         }
         const u = stripUploads(unwrapPasted(content));
-        put({ kind: 'user', id, text: u.text.trim(), images: u.images });
+        put({ kind: 'user', id, text: u.text.trim(), images: [], files: u.files });
         continue;
       }
       if (!Array.isArray(content)) continue;
@@ -283,8 +291,8 @@ function parseLines(lines: string[], st: ParseState): { changed: ChatItem[]; bad
         continue;
       }
       const texts = blocks.filter((b) => b.type === 'text').map((b) => b.text ?? '');
-      const images = blocks.filter((b) => b.type === 'image').length;
-      if (texts.length === 0 && images === 0) continue;
+      const images = blocks.filter((b) => b.type === 'image').map(imageOf);
+      if (texts.length === 0 && images.length === 0) continue;
       const joined = texts.join('\n');
       const sp = special(id, joined);
       if (sp === 'skip') continue;
@@ -293,7 +301,7 @@ function parseLines(lines: string[], st: ParseState): { changed: ChatItem[]; bad
         continue;
       }
       const u = stripUploads(unwrapPasted(joined).replace(/\[Image #\d+\]\s*/g, ''));
-      put({ kind: 'user', id, text: u.text.trim(), images: images + u.images });
+      put({ kind: 'user', id, text: u.text.trim(), images, files: u.files });
       continue;
     }
 

@@ -11,6 +11,7 @@ import { appendFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from '
 import { join } from 'node:path';
 
 const PASTE_MS = 250;
+const PNG_1PX = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
 const RULE = '─'.repeat(60);
 const OPTIONS = ['Да', 'Да и не спрашивать', 'Нет'];
 const dir = process.env.CVG_CLAUDE_DIR;
@@ -78,7 +79,8 @@ function submit() {
   if (!text) return;
   const shown = pasted ? `${images ? `[Image #${images}]` : ''}${text.split('\n')[0]}` : field;
   history.push(`› ${shown}`);
-  record('user', text);
+  // Как настоящий Claude Code: путь к картинке → «[Image #N]» и блок image с данными
+  record('user', images ? [{ type: 'text', text: `[Image #${images}]${text}` }, ...Array.from({ length: images }, () => ({ type: 'image', source: { type: 'base64', media_type: 'image/png', data: PNG_1PX } }))] : text);
   field = '';
   pasted = null;
   images = 0;

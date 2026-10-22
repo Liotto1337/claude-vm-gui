@@ -1,6 +1,7 @@
 import { memo, useState } from 'react';
 import type { ChatItem } from '@shared/ipc';
-import { IconChevron, IconChevronRight, IconImage } from './icons';
+import { FileView, JournalImage } from './FileView';
+import { IconChevron, IconChevronRight } from './icons';
 import { Markdown } from './Markdown';
 import { TypedMarkdown } from './TypedMarkdown';
 
@@ -66,14 +67,12 @@ export const ChatItemView = memo(function ChatItemView({ item, typingSince, onTy
     case 'user':
       return (
         <div className="bubble">
-          {item.images > 0
-            ? Array.from({ length: item.images }, (_, i) => (
-                <span key={i} className="img-chip">
-                  <IconImage />
-                  Картинка
-                </span>
-              ))
-            : null}
+          {item.images.map((im, i) => (
+            <JournalImage key={i} image={im} />
+          ))}
+          {item.files.map((f) => (
+            <FileView key={f} path={f} />
+          ))}
           {item.text ? <span className="bubble-text">{item.text}</span> : null}
         </div>
       );

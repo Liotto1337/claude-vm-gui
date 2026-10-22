@@ -19,7 +19,7 @@ export class UploadService extends EventEmitter {
 
   private async uploadDir(): Promise<string> {
     if (this.dir) return this.dir;
-    const r = await this.conn.exec(`mkdir -p ${UPLOAD_DIR} && cd ${UPLOAD_DIR} && pwd`);
+    const r = await this.conn.exec(`mkdir -p ${UPLOAD_DIR} && cd ${UPLOAD_DIR} && pwd -P`);
     if (r.code !== 0) throw new Error(r.stderr.trim() || 'Не удалось создать папку для загрузок');
     this.dir = r.stdout.trim();
     return this.dir;
@@ -55,6 +55,36 @@ export class UploadService extends EventEmitter {
         } else writeNext();
       });
       return ok({ remotePath });
+    } catch (e) {
+      return fail('UPLOAD_FAILED', (e as Error).message);
+    }
+  }
+
+  /**
+   * Начало загруженного файла для ленты: не больше maxBytes и полный размер. Только внутри папки загрузок —
+   * путь проверяется после realpath (никаких «..» и ссылок наружу).
+   */
+  async read(path: string, maxBytes: number): Promise<Result<{ bytes: Uint8Array; size: number; truncated: boolean }>> {
+    if (!this.conn.connected) return fail('NOT_CONNECTED', 'Нет подключения к ВМ');
+    if (typeof path !== 'string' || !path.startsWith('/')) return fail('BAD_PATH', 'Файл не из папки загрузок');
+    try {
+      const dir = await this.uploadDir();
+      const sftp = await this.conn.sftp();
+      const real = await new Promise<string | null>((resolve) => sftp.realpath(path, (err, p) => resolve(err ? null : p)));
+      if (real === null) return fail('NOT_FOUND', 'Файл удалён с ВМ');
+      if (!real.startsWith(`${dir}/`)) return fail('BAD_PATH', 'Файл не из папки загрузок');
+      const st = await new Promise<{ size: number; isFile(): boolean } | null>((resolve) => sftp.stat(real, (err, s) => resolve(err ? null : s)));
+      if (!st || !st.isFile()) return fail('NOT_FOUND', 'Файл удалён с ВМ');
+      const n = Math.max(0, Math.min(st.size, maxBytes));
+      const chunks: Buffer[] = [];
+      if (n > 0)
+        await new Promise<void>((resolve, reject) => {
+          const rs = sftp.createReadStream(real, { start: 0, end: n - 1 });
+          rs.on('data', (c: Buffer) => chunks.push(c));
+          rs.on('error', reject);
+          rs.on('end', () => resolve());
+        });
+      return ok({ bytes: new Uint8Array(Buffer.concat(chunks)), size: st.size, truncated: st.size > n });
     } catch (e) {
       return fail('UPLOAD_FAILED', (e as Error).message);
     }

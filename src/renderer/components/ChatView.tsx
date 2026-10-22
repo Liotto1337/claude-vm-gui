@@ -1,8 +1,9 @@
 import { useLayoutEffect, useRef, useState } from 'react';
+import { displayName, isImageName } from '@shared/upload-name';
 import { api } from '../api';
 import { typingDone, useAppState } from '../state';
 import { ChatItemView } from './ChatItemView';
-import { IconImage } from './icons';
+import { IconFile, IconImage } from './icons';
 import { Spinner } from './Spinner';
 
 const NEAR_BOTTOM = 48;
@@ -115,10 +116,10 @@ export function ChatView({ session }: { session: string }) {
         ))}
         {pending.map((p) => (
           <div key={p.id} className={p.state === 'sending' ? 'bubble is-sending' : 'bubble'}>
-            {Array.from({ length: p.images }, (_, k) => (
-              <span key={k} className="img-chip">
-                <IconImage />
-                Картинка
+            {p.files.map((f) => (
+              <span key={f} className="img-chip">
+                {isImageName(f) ? <IconImage /> : <IconFile />}
+                {displayName(f)}
               </span>
             ))}
             {p.text ? <span className="bubble-text">{p.text}</span> : null}

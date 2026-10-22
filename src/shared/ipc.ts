@@ -20,7 +20,9 @@ export type ErrorCode =
   | 'HINTS_FAILED'
   | 'CONFIG_INVALID'
   | 'SEND_NOT_CONFIRMED'
-  | 'NO_TRANSCRIPT';
+  | 'NO_TRANSCRIPT'
+  | 'NOT_FOUND'
+  | 'BAD_PATH';
 
 export interface VmConfig {
   host: string;
@@ -103,9 +105,11 @@ export interface MetricsSample {
 }
 export interface SystemInfo { os: string; kernel: string; cores: number; claudeVersion: string | null }
 
-/** Элемент ленты переписки (из журнала Claude Code). */
+/** Картинка сообщения из журнала (блок image): base64; без данных — пустые строки. */
+export interface ChatImage { mediaType: string; data: string }
+/** Элемент ленты переписки (из журнала Claude Code). files — пути вложений из папки загрузок на ВМ. */
 export type ChatItem =
-  | { kind: 'user'; id: string; text: string; images: number }
+  | { kind: 'user'; id: string; text: string; images: ChatImage[]; files: string[] }
   | { kind: 'assistant'; id: string; text: string }
   | { kind: 'thinking'; id: string }
   | { kind: 'note'; id: string; text: string }
@@ -184,6 +188,8 @@ export interface Api {
     /** Любой файл до 50 МБ в папку загрузок на ВМ; name — исходное имя (войдёт в имя на ВМ) */
     file(id: string, bytes: Uint8Array, name: string): Promise<Result<{ remotePath: string }>>;
     onProgress(cb: (p: UploadProgress) => void): Unsubscribe;
+    /** Начало файла из папки загрузок (не больше maxBytes) и его полный размер; NOT_FOUND — удалён, BAD_PATH — путь вне папки */
+    read(path: string, maxBytes: number): Promise<Result<{ bytes: Uint8Array; size: number; truncated: boolean }>>;
   };
   clipboard: { read(): Promise<string>; write(text: string): void };
   layout: { get(): Promise<SidebarLayout>; save(l: SidebarLayout): Promise<Result<void>> };

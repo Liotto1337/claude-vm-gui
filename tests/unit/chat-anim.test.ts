@@ -16,9 +16,9 @@ describe('«печать» ответа', () => {
 });
 
 describe('временный пузырь отправленного сообщения', () => {
-  const u = (id: string, text: string, images = 0): ChatItem => ({ kind: 'user', id, text, images });
+  const u = (id: string, text: string, images = 0): ChatItem => ({ kind: 'user', id, text, images: Array.from({ length: images }, () => ({ mediaType: 'image/png', data: '' })), files: [] });
   const p = (id: string, text: string, seen: string[], state: Pending['state'] = 'sent', images = 0): Pending =>
-    ({ id, text, images, state, seen: new Set(seen), at: 0 });
+    ({ id, text, files: Array.from({ length: images }, (_, i) => `/u/claude-vm-gui/uploads/${i}.png`), state, seen: new Set(seen), at: 0 });
 
   it('новая запись журнала с тем же текстом забирает пузырь', () =>
     expect(claimPending([p('p1', 'привет', ['u0'])], [u('u0', 'привет'), u('u1', 'привет')], 1000)).toEqual([]));
@@ -63,7 +63,7 @@ describe('какие ответы «печатаются»', () => {
 
   it('новый ответ — печатается с текущего момента', () => expect(nextTyping({}, [], ev([a('x')]), 5)).toEqual({ x: 5 }));
   it('уже известный ответ и сообщения пользователя — нет', () =>
-    expect(nextTyping({}, [a('x')], ev([a('x'), { kind: 'user', id: 'u', text: 'hi', images: 0 }]), 5)).toEqual({}));
+    expect(nextTyping({}, [a('x')], ev([a('x'), { kind: 'user', id: 'u', text: 'hi', images: [], files: [] }]), 5)).toEqual({}));
   it('история при открытии и «Показать раньше» — сразу', () => {
     expect(nextTyping({}, [], ev([a('x')], true), 5)).toEqual({});
     expect(nextTyping({}, [], ev([a('x')], false, true), 5)).toEqual({});
@@ -78,8 +78,8 @@ describe('какие ответы «печатаются»', () => {
 });
 
 describe('пузыри: слеш-команды и очередь', () => {
-  const u = (id: string, text: string): ChatItem => ({ kind: 'user', id, text, images: 0 });
-  const p = (id: string, text: string, seen: string[] = []): Pending => ({ id, text, images: 0, state: 'sent', seen: new Set(seen), at: 0 });
+  const u = (id: string, text: string): ChatItem => ({ kind: 'user', id, text, images: [], files: [] });
+  const p = (id: string, text: string, seen: string[] = []): Pending => ({ id, text, files: [], state: 'sent', seen: new Set(seen), at: 0 });
   it('«/model» и «/model opus» снимаются записями журнала', () => {
     expect(claimPending([p('1', '/model')], [u('a', '/model')], 1)).toEqual([]);
     expect(claimPending([p('1', '/model  opus')], [u('a', '/model opus')], 1)).toEqual([]);
@@ -103,7 +103,20 @@ describe('claimPending и многострочная вставка', () => {
   it('пузырь отправленного многострочного текста забирается записью с pasted_content', () => {
     const line = JSON.stringify({ type: 'user', uuid: 'm1', message: { role: 'user', content: '<pasted_content id="c1">\nстрока 1\nстрока 2\n</pasted_content id="c1">' } });
     const items = parseTranscriptLines([line], newParseState()).changed;
-    const pend: Pending[] = [{ id: 'p1', text: 'строка 1\nстрока 2', images: 0, state: 'sent', seen: new Set(), at: 1 }];
+    const pend: Pending[] = [{ id: 'p1', text: 'строка 1\nстрока 2', files: [], state: 'sent', seen: new Set(), at: 1 }];
     expect(claimPending(pend, items, 2)).toEqual([]);
+  });
+});
+
+describe('claimPending и вложения', () => {
+  it('файл без превращения в картинку: пузырь с файлом забирается записью с тем же числом вложений', () => {
+    const item: ChatItem = { kind: 'user', id: 'x', text: 'см', images: [], files: ['/u/claude-vm-gui/uploads/a.txt'] };
+    const pend: Pending[] = [{ id: 'p', text: 'см', files: ['/u/claude-vm-gui/uploads/a.txt'], state: 'sent', seen: new Set(), at: 1 }];
+    expect(claimPending(pend, [item], 2)).toEqual([]);
+  });
+  it('картинка стала блоком image журнала — тоже совпадает', () => {
+    const item: ChatItem = { kind: 'user', id: 'x', text: 'см', images: [{ mediaType: 'image/png', data: 'A' }], files: [] };
+    const pend: Pending[] = [{ id: 'p', text: 'см', files: ['/u/claude-vm-gui/uploads/a.png'], state: 'sent', seen: new Set(), at: 1 }];
+    expect(claimPending(pend, [item], 2)).toEqual([]);
   });
 });

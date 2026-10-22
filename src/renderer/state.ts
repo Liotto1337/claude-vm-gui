@@ -273,10 +273,10 @@ export function setServerOpen(open: boolean): void {
 let pendingSeq = 0;
 
 /** Сообщение показано в ленте сразу, до отправки (темнее обычного). */
-export function addPending(session: string, text: string, images: number): string {
+export function addPending(session: string, text: string, files: string[]): string {
   const id = `pending-${++pendingSeq}`;
   patchChat(session, (c) => ({
-    pending: [...c.pending, { id, text, images, state: 'sending', seen: new Set(c.items.map((i) => i.id)), at: 0 }],
+    pending: [...c.pending, { id, text, files, state: 'sending', seen: new Set(c.items.map((i) => i.id)), at: 0 }],
   }));
   return id;
 }

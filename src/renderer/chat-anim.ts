@@ -37,7 +37,8 @@ export function nextTyping(
 export interface Pending {
   id: string;
   text: string;
-  images: number;
+  /** пути вложений на ВМ */
+  files: string[];
   state: 'sending' | 'sent';
   /** id элементов ленты на момент отправки: запись журнала ищется среди новых */
   seen: Set<string>;
@@ -50,7 +51,7 @@ const SENT_TTL_MS = 20_000;
 const norm = (s: string) => s.replace(/^\s*!\s*/, '! ').replace(/\s+/g, ' ').trim();
 
 /**
- * Убирает временные пузыри, у которых появилась запись в журнале (новый user с тем же текстом и числом картинок).
+ * Убирает временные пузыри, у которых появилась запись в журнале (новый user с тем же текстом и числом вложений).
  * Запись, забравшая пузырь, становится «виденной» для остальных — на следующих вызовах она второй пузырь не заберёт.
  * Доставленный пузырь без записи уходит через 20 с; пока Claude работает (busy), отсчёт стоит:
  * сообщение может ждать в очереди Claude Code.
@@ -59,7 +60,10 @@ export function claimPending(pending: Pending[], items: ChatItem[], now: number,
   const claimed: string[] = [];
   const left = pending.filter((p) => {
     const match = items.find(
-      (i) => i.kind === 'user' && !p.seen.has(i.id) && !claimed.includes(i.id) && i.images === p.images && norm(i.text) === norm(p.text),
+      (i) =>
+        i.kind === 'user' && !p.seen.has(i.id) && !claimed.includes(i.id) &&
+        // картинку Claude Code превращает в блок image, остальные файлы остаются путями
+        i.images.length + i.files.length === p.files.length && norm(i.text) === norm(p.text),
     );
     if (match) {
       claimed.push(match.id);
