@@ -81,3 +81,26 @@ describe('TerminalService.send: принято ли сообщение', () => {
     expect(enters()).toBe(1);
   });
 });
+
+describe('TerminalService.send сразу после выбора сессии', () => {
+  it('терминал ещё подключается — отправка ждёт подключения, а не отвечает «Сессия не открыта»', async () => {
+    const { term, enters, release } = (() => {
+      const s = setup((n) => (n === 0 ? 'привет' : ''));
+      let release!: () => void;
+      const gate = new Promise<void>((r) => (release = r));
+      const conn = (term0: TerminalService) => (term0 as unknown as { conn: { openPty: () => Promise<unknown> } }).conn;
+      const orig = conn(s.term).openPty;
+      conn(s.term).openPty = async () => {
+        await gate;
+        return orig();
+      };
+      return { ...s, release };
+    })();
+    const opened = term.open('s', 80, 24);
+    const sent = term.send('привет', []);
+    setTimeout(release, 30);
+    expect((await opened).ok).toBe(true);
+    expect(await sent).toEqual({ ok: true, data: undefined });
+    expect(enters()).toBe(1);
+  });
+});

@@ -59,7 +59,16 @@ export class TerminalService extends EventEmitter {
     return this.session;
   }
 
-  async open(name: string, cols: number, rows: number): Promise<Result<void>> {
+  /** Идущее подключение к сессии: отправка сразу после выбора сессии ждёт его, а не отвечает «Сессия не открыта» */
+  private opening: Promise<unknown> = Promise.resolve();
+
+  open(name: string, cols: number, rows: number): Promise<Result<void>> {
+    const r = this.attach(name, cols, rows);
+    this.opening = r;
+    return r;
+  }
+
+  private async attach(name: string, cols: number, rows: number): Promise<Result<void>> {
     if (!validateSessionName(name)) return fail('BAD_NAME', 'Недопустимое имя сессии');
     if (!this.conn.connected) return fail('NOT_CONNECTED', 'Нет подключения к ВМ');
     this.detachStream();
@@ -134,6 +143,7 @@ export class TerminalService extends EventEmitter {
    * Если проверить не удалось — не пишем. `allowMenu` — для клавиш карточки меню: им открытое меню не мешает.
    */
   private async checkWritable(allowMenu = false): Promise<Result<void>> {
+    await this.opening;
     const session = this.session;
     if (!session) return fail('NO_SESSION', 'Сессия не открыта');
     const sep = '__cvg_sep__';
@@ -179,6 +189,7 @@ export class TerminalService extends EventEmitter {
     } catch (e) {
       return fail('BAD_NAME', (e as Error).message);
     }
+    await this.opening;
     if (!this.stream) return fail('NO_SESSION', 'Сессия не открыта');
     const check = await this.checkWritable(true);
     if (!check.ok) return check;
@@ -187,6 +198,7 @@ export class TerminalService extends EventEmitter {
   }
 
   private async writeChecked(data: () => string): Promise<Result<void>> {
+    await this.opening;
     if (!this.stream) return fail('NO_SESSION', 'Сессия не открыта');
     const check = await this.checkWritable();
     if (!check.ok) return check;
@@ -236,8 +248,9 @@ export class TerminalService extends EventEmitter {
    */
   async send(text: string, imagePaths: string[]): Promise<Result<void>> {
     const data = bracketedPaste(text, imagePaths);
-    const name = this.session;
     const r = await this.writeChecked(() => data.slice(0, -1));
+    // Сессия — после записи: отправка могла ждать подключения к только что выбранной сессии
+    const name = this.session;
     if (!r.ok || !name) return r;
     const t = this.timings;
     const menuOpen = () => fail<void>('PROMPT_OPEN', PROMPT_OPEN_TEXT);
