@@ -1,0 +1,40 @@
+
+[31m ▐[40m▛███▛█[39m[49m   [1mClaude Code[0m[39m[49m [2m[37mv2.1.308[0m[39m[49m
+[31m▝▜[40m█████[49m█▀[39m  [2m[37mHaiku 5.5 with medium effort · Claude Pro[0m[39m[49m
+[31m ▝▝   ▝▝ [39m  [2m[37m/tmp/project[0m[39m[49m
+
+
+[37m[40m❯ [97mask-multi: x[39m
+
+[37m[49m● [39mUser answered Claude's questions:
+[2m[37m  ⎿  [0m[37m[49m· Какие цвета взять? → Глина, Чёрный[39m
+
+[97m●[39m готово
+
+[2m[37m✻[0m[39m[49m [2m[37mCooked for 0s · done 7:29 PM
+[0m[39m[49m
+[37m[40m❯ [97mask-two: x[39m
+
+[37m[49m● [39mUser declined to answer questions
+[2m[37m  ⎿  [0m[37m[49m· Какой цвет кнопки? (Глина / Чёрный / Белый)[39m
+     [37m· Какой размер? (Маленький / Большой)[39m
+
+[2m[37m✻[0m[39m[49m [2m[37mCogitated for 0s · done 7:29 PM[0m[39m[49m
+
+
+
+[97m▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔
+[39m   [1m[97mSelect model[0m[39m[49m
+   [2m[37mSwitch between Claude models. Your pick becomes the default for new sessions. For other/previous model names, [0m[39m[49m
+   [2m[37mspecify with --model.[0m[39m[49m
+
+     [2m[37m1. [0m[39m[49mDefault (recommended)  [31mOpus 5.5[2m[37m · Best for everyday, complex tasks[0m[39m[49m
+     [2m[37m2. [0m[39m[49mOpus                   [31mOpus 5.5[2m[37m · Best for everyday, complex tasks · ~2× usage vs Sonnet[0m[39m[49m
+     [2m[37m3. [0m[39m[49mFable                  [2m[37mFable 5.1 · Most capable for your hardest and longest-running tasks · Requires usage [0m[39m[49m
+                               [2m[37mcredits[0m[39m[49m
+     [2m[37m4. [0m[39m[49mSonnet                 [2m[37mSonnet 5.5 · Efficient for routine tasks[0m[39m[49m
+   [97m❯[39m [2m[37m5. [0m[32m[49mHaiku[39m [32m✔[39m                [2m[37mHaiku 5.5 · Fastest for quick answers[0m[39m[49m
+
+   [31m●[2m[37m High effort[0m[30m[49m ←/→ to adjust[39m
+
+   [2m[37mEnter to set as default · s to use this session only · Esc to cancel[0m[39m[49m

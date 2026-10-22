@@ -24,7 +24,7 @@ export function slashCommand(cmd: 'model' | 'effort', arg: string): string {
 
 const KEYS: Record<string, string> = {
   up: '\x1b[A', down: '\x1b[B', right: '\x1b[C', left: '\x1b[D',
-  enter: '\r', esc: '\x1b', tab: '\t', 'shift-tab': '\x1b[Z',
+  enter: '\r', esc: '\x1b', tab: '\t', 'shift-tab': '\x1b[Z', space: ' ',
 };
 
 /** Байты клавиши для терминала. Только белый список: стрелки, Enter, Esc, Tab, Shift+Tab, цифры 1–9. */

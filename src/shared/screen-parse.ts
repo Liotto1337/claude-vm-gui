@@ -90,9 +90,24 @@ export function menuFooterIndex(plain: string): number {
   const lines = plain.split('\n').map((l) => l.replace(/\s+$/, ''));
   const tail = lines.map((l, i) => [l, i] as const).filter(([l]) => l.trim() !== '').slice(-3);
   const footer = [...tail].reverse().find(([l]) => DIALOG_FOOTER.test(l));
-  if (!footer) return -1;
+  if (!footer) return reviewEnd(lines);
   const box = inputBox(lines);
   return box && box[1] > footer[1] ? -1 : footer[1];
+}
+
+const REVIEW = /^Ready to submit your answers\?$/;
+const NUMBERED = /^\s*(?:❯\s*)?\d+\.\s/;
+
+/**
+ * «Review your answers» AskUserQuestion рисуется без подсказки внизу: после «Ready to submit your answers?»
+ * до конца экрана — только варианты. Тогда «подсказка» — за последней строкой (lines.length), иначе -1.
+ */
+function reviewEnd(lines: string[]): number {
+  const filled = lines.map((l, i) => [l, i] as const).filter(([l]) => l.trim() !== '');
+  const at = filled.findIndex(([l]) => REVIEW.test(l.trim()));
+  if (at < 0) return -1;
+  const after = filled.slice(at + 1);
+  return after.length >= 2 && after.every(([l]) => NUMBERED.test(l)) ? lines.length : -1;
 }
 
 /**
@@ -103,22 +118,46 @@ export function dialogOpen(paneText: string): boolean {
   return menuFooterIndex(stripAnsi(paneText)) >= 0;
 }
 
+const CHECKBOX = /^\s*(?:❯\s*)?\d+\.\s+\[[ ✔]\]\s/;
+const TABS = /^←\s+(.+?)\s+→$/;
+const AXIS = /^[◐◑◒◓◔◕●○]\s+(.+?)\s+←\/→ to adjust$/;
 const MAX_TRAILING = 3; // строк между вариантами и подсказкой («… +2 models», «● High effort …»)
 
 /** Меню Claude Code внизу экрана или null. */
 export function parseMenu(plain: string): ParsedMenu | null {
   const lines = plain.split('\n').map((l) => l.replace(/\s+$/, ''));
-  const f = menuFooterIndex(plain);
+  let f = menuFooterIndex(plain);
   if (f < 0) return null;
+  // Множественный выбор: «Submit» — строка без номера под вариантами (с курсором — «❯    Submit»); разбираем без неё
+  const multi = lines.slice(0, f).some((l) => CHECKBOX.test(l));
+  let submit: { after: number; selected: boolean } | null = null;
+  if (multi)
+    for (let i = f - 1; i >= 0; i--)
+      if (/^\s*(?:❯\s*)?Submit$/.test(lines[i])) {
+        submit = { after: -1, selected: lines[i].includes('❯') };
+        lines.splice(i, 1);
+        f--;
+        break;
+      }
   let s = -1;
   for (let i = f - 1; i >= 0; i--)
     if (/^\s*❯\s/.test(lines[i])) {
       s = i;
       break;
     }
-  if (s < 0) return null;
-  const c = lines[s].indexOf('❯');
-  const labelCol = c + 1 + (lines[s].slice(c + 1).length - lines[s].slice(c + 1).trimStart().length);
+  // Курсор на «Submit»: колонки берём по последнему варианту с чекбоксом («❯ » — два символа перед номером)
+  let c: number;
+  let labelCol: number;
+  if (s < 0 && submit?.selected) {
+    for (let i = f - 1; i >= 0 && s < 0; i--) if (CHECKBOX.test(lines[i])) s = i;
+    if (s < 0) return null;
+    labelCol = indentOf(lines[s]);
+    c = labelCol - 2;
+  } else {
+    if (s < 0) return null;
+    c = lines[s].indexOf('❯');
+    labelCol = c + 1 + (lines[s].slice(c + 1).length - lines[s].slice(c + 1).trimStart().length);
+  }
 
   type Kind = 'option' | 'cont' | 'rule' | 'other';
   const kindOf = (l: string): Kind => {
@@ -157,15 +196,26 @@ export function parseMenu(plain: string): ParsedMenu | null {
       continue;
     }
     const num = /^(\d+)\.\s+(.*)$/.exec(text);
-    const body = num ? num[2] : text;
+    const box = /^\[([ ✔])\]\s+(.*)$/.exec(num ? num[2] : text);
+    const body = box ? box[2] : num ? num[2] : text;
     const [label, ...rest] = body.split(/\s{2,}/);
-    options.push({ n: num ? Number(num[1]) : null, label: label.trim(), description: rest.join(' ').trim(), selected: l[c] === '❯' });
+    const o: MenuOption = { n: num ? Number(num[1]) : null, label: label.trim(), description: rest.join(' ').trim(), selected: l[c] === '❯' };
+    if (box) {
+      o.checked = box[1] === '✔';
+      if (submit) submit.after = options.length;
+    }
+    if (/^Type something\.?$/.test(o.label)) o.input = true;
+    options.push(o);
   }
+  if (submit) options.splice(submit.after + 1, 0, { n: null, label: 'Submit', description: '', selected: submit.selected, submit: true });
   let trailing = 0;
+  let axis: ParsedMenu['axis'] = null;
   for (; i < f; i++) {
     const l = lines[i].trim();
     if (l !== '' && !isRule(l, '─╌▔')) {
-      notes.push(l);
+      const ax = AXIS.exec(l);
+      if (ax) axis = { label: /effort/i.test(ax[1]) ? 'effort' : '', value: ax[1] };
+      else notes.push(l);
       trailing++;
     }
   }
@@ -185,9 +235,21 @@ export function parseMenu(plain: string): ParsedMenu | null {
     }
     if (l !== '') head.push({ text: l, code: inCode });
   }
+  // Вкладки вопросов AskUserQuestion: ☐ — без ответа, ☒ — отвечен; текущий — первый без ответа
+  let tabs: ParsedMenu['tabs'] = null;
+  const tabLine = head.length ? TABS.exec(head[0].text) : null;
+  if (tabLine) {
+    const raw = tabLine[1].split(/\s{2,}/).filter((t) => !/^✔\s*Submit$/.test(t));
+    const open = raw.findIndex((t) => t.startsWith('☐'));
+    tabs = { labels: raw.map((t) => t.replace(/^[☐☒✔]\s*/, '')), current: open >= 0 ? open : raw.length - 1 };
+    head.shift();
+  }
   const [title = { text: '' }, ...rest] = head;
   const ctx = rest.slice(0, 6);
-  return { title: title.text, context: ctx.map((c) => c.text), code: ctx.map((c) => c.code), options, notes, hint: lines[f].trim() };
+  return {
+    title: title.text, context: ctx.map((c) => c.text), code: ctx.map((c) => c.code), options, notes, hint: lines[f]?.trim() ?? null,
+    kind: multi ? 'multi' : 'single', tabs, axis,
+  };
 }
 
 /** Что сейчас на экране claude. `no-claude` решает вызывающий (по процессу в панели). */
@@ -200,12 +262,25 @@ export function classifyScreen(screen: string): ScreenState {
   return { kind: 'unknown' };
 }
 
+const arrowsTo = (menu: ParsedMenu, index: number): MenuKey[] => {
+  const sel = Math.max(0, menu.options.findIndex((o) => o.selected));
+  const delta = index - sel;
+  return Array<MenuKey>(Math.abs(delta)).fill(delta > 0 ? 'down' : 'up');
+};
+
+/** Множественный выбор: отметить или снять вариант index — стрелки до него и пробел. */
+export const toggleKeysFor = (menu: ParsedMenu, index: number): MenuKey[] => (menu.options[index] ? [...arrowsTo(menu, index), 'space'] : []);
+
+/** Множественный выбор: «Готово» — стрелки до «Submit» и Enter (дальше Claude Code показывает «Review your answers»). */
+export function submitKeysFor(menu: ParsedMenu): MenuKey[] {
+  const i = menu.options.findIndex((o) => o.submit);
+  return i < 0 ? [] : [...arrowsTo(menu, i), 'enter'];
+}
+
 /** Клавиши для выбора варианта index: цифра, если у варианта есть номер, иначе стрелки от выбранного и Enter. */
 export function menuKeysFor(menu: ParsedMenu, index: number): MenuKey[] {
   const opt = menu.options[index];
   if (!opt) return [];
   if (opt.n !== null && opt.n >= 1 && opt.n <= 9) return [String(opt.n) as MenuKey];
-  const sel = Math.max(0, menu.options.findIndex((o) => o.selected));
-  const delta = index - sel;
-  return [...Array<MenuKey>(Math.abs(delta)).fill(delta > 0 ? 'down' : 'up'), 'enter'];
+  return [...arrowsTo(menu, index), 'enter'];
 }

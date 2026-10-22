@@ -2,7 +2,7 @@
 // Фейковый Messages API для разработки: настоящий Claude Code с ANTHROPIC_BASE_URL=http://127.0.0.1:8787
 // рисует запросы разрешений, AskUserQuestion и т. п. без единого запроса к модели.
 // Сценарий — по последнему сообщению пользователя:
-//   «bash: <команда>» — вызов Bash; «ask:» — AskUserQuestion; «edit: <путь>» — Write в этот файл;
+//   «bash: <команда>» — вызов Bash; «ask:» — AskUserQuestion («ask-multi:» — несколько ответов, «ask-two:» — два вопроса); «edit: <путь>» — Write в этот файл;
 //   «slow:» — ответ через 8 с (экран «работает»); ответ на tool_result — «готово»; всё прочее — «ок».
 // Заголовки запросов (там токен) не логируются.
 import { createServer } from 'node:http';
@@ -26,6 +26,20 @@ function reply(body) {
   if (toolResult) return [{ type: 'text', text: 'готово' }];
   const bash = /bash:\s*([^\n<]+)/.exec(text);
   if (bash) return [{ type: 'tool_use', id: `toolu_${randomUUID().slice(0, 8)}`, name: 'Bash', input: { command: bash[1].trim(), description: 'тест' } }];
+  const COLORS = [{ label: 'Глина', description: 'фирменный' }, { label: 'Чёрный', description: 'строгий' }, { label: 'Белый', description: 'светлый' }];
+  if (/ask-multi:/.test(text))
+    return [{
+      type: 'tool_use', id: `toolu_${randomUUID().slice(0, 8)}`, name: 'AskUserQuestion',
+      input: { questions: [{ question: 'Какие цвета взять?', header: 'Цвета', multiSelect: true, options: COLORS }] },
+    }];
+  if (/ask-two:/.test(text))
+    return [{
+      type: 'tool_use', id: `toolu_${randomUUID().slice(0, 8)}`, name: 'AskUserQuestion',
+      input: { questions: [
+        { question: 'Какой цвет кнопки?', header: 'Цвет', multiSelect: false, options: COLORS },
+        { question: 'Какой размер?', header: 'Размер', multiSelect: false, options: [{ label: 'Маленький', description: '' }, { label: 'Большой', description: '' }] },
+      ] },
+    }];
   if (/ask:/.test(text))
     return [{
       type: 'tool_use', id: `toolu_${randomUUID().slice(0, 8)}`, name: 'AskUserQuestion',

@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { dialogOpen } from '../../src/shared/dialog';
-import { classifyScreen, inputText, menuKeysFor, parseMenu, parseStatus, stripAnsi } from '../../src/shared/screen-parse';
+import { classifyScreen, inputText, menuKeysFor, parseMenu, parseStatus, stripAnsi, submitKeysFor, toggleKeysFor } from '../../src/shared/screen-parse';
 
 // Снимки настоящего Claude Code 2.1.303 (scripts/dev/capture-screen.sh)
 const fx = (n: string) => readFileSync(join(__dirname, '../fixtures/screens', `${n}.ans`), 'utf8');
@@ -51,7 +51,7 @@ describe('parseMenu', () => {
     expect(m.options[1].description).toContain('~2× usage vs Sonnet');
     expect(m.options[2]).toMatchObject({ n: 3, label: 'Fable' });
     expect(m.notes.some((n) => n.includes('+2 models'))).toBe(true);
-    expect(m.notes.some((n) => n.includes('High effort'))).toBe(true);
+    expect(m.axis?.value).toBe('High effort');
   });
   it('запрос Bash: команда в контексте, 4 варианта', () => {
     const m = parseMenu(plain('permission-bash'))!;
@@ -135,4 +135,65 @@ describe('ложное меню', () => {
     }
   });
   it('один вариант — не меню', () => expect(parseMenu([rule, ' Вопрос', ' ❯ 1. Да', ' Esc to cancel'].join('\n'))).toBeNull());
+});
+
+// Снимки Claude Code 2.1.308 (scripts/dev/capture-screen.sh, фейковый API): в множественном выборе отметку ставят
+// и пробел, и Enter («[ ]» → «[✔]»); «Submit» — строка без номера под вариантами, Enter на ней открывает
+// «Review your answers» (без строки подсказки внизу); вкладки вопросов — «←  ☐ Цвет  ☐ Размер  ✔ Submit  →»
+// (☐ — без ответа, ☒ — отвечен); «Type something.» — свой ответ: набранный текст встаёт прямо на место подписи;
+// /model — ось effort «◐ Medium effort (default) ←/→ to adjust».
+describe('меню Claude Code 2.1.308: множественный выбор, вкладки, свой ответ, effort', () => {
+  const pm = (n: string) => parseMenu(stripAnsi(fx(n)))!;
+  it('множественный выбор: чекбоксы, «Submit» — отдельный пункт, свой ответ', () => {
+    const m = pm('ask-multi');
+    expect(m.kind).toBe('multi');
+    expect(m.title).toBe('Какие цвета взять?');
+    expect(m.options.map((o) => o.label)).toEqual(['Глина', 'Чёрный', 'Белый', 'Type something', 'Submit', 'Chat about this']);
+    expect(m.options.map((o) => o.checked)).toEqual([false, false, false, false, undefined, undefined]);
+    expect(m.options.map((o) => !!o.input)).toEqual([false, false, false, true, false, false]);
+    expect(m.options.map((o) => !!o.submit)).toEqual([false, false, false, false, true, false]);
+    expect(m.options.findIndex((o) => o.selected)).toBe(0);
+    expect(m.tabs).toEqual({ labels: ['Цвета'], current: 0 });
+  });
+  it('отмеченные варианты и курсор', () => {
+    const m = pm('ask-multi-checked');
+    expect(m.options.slice(0, 4).map((o) => o.checked)).toEqual([true, true, false, false]);
+    expect(m.options.findIndex((o) => o.selected)).toBe(1);
+  });
+  it('клавиши: отметка — стрелки и пробел, «Готово» — стрелки до Submit и Enter', () => {
+    expect(toggleKeysFor(pm('ask-multi'), 2)).toEqual(['down', 'down', 'space']);
+    expect(submitKeysFor(pm('ask-multi'))).toEqual(['down', 'down', 'down', 'down', 'enter']);
+    expect(submitKeysFor(pm('ask-multi-checked'))).toEqual(['down', 'down', 'down', 'enter']);
+  });
+  it('два вопроса: вкладки и текущий вопрос', () => {
+    const a = pm('ask-two');
+    expect(a.kind).toBe('single');
+    expect(a.tabs).toEqual({ labels: ['Цвет', 'Размер'], current: 0 });
+    expect(a.title).toBe('Какой цвет кнопки?');
+    expect(a.options.find((o) => o.input)?.label).toBe('Type something.');
+    const b = pm('ask-two-second');
+    expect(b.tabs).toEqual({ labels: ['Цвет', 'Размер'], current: 1 });
+    expect(b.title).toBe('Какой размер?');
+  });
+  it('«Review your answers» без подсказки внизу — тоже меню', () => {
+    const r = pm('ask-review');
+    expect(r.title).toBe('Review your answers');
+    expect(r.options.map((o) => o.label)).toEqual(['Submit answers', 'Cancel']);
+    expect(dialogOpen(fx('ask-review'))).toBe(true);
+    expect(classifyScreen(fx('ask-review')).kind).toBe('menu');
+  });
+  it('/model: ось effort отдельно от заметок', () => {
+    const m = pm('model-effort');
+    expect(m.axis).toEqual({ label: 'effort', value: 'Medium effort (default)' });
+    expect(m.notes).toEqual([]);
+    expect(pm('model-effort-high').axis?.value).toBe('High effort');
+    expect(pm('model').axis?.value).toBe('High effort');
+    expect(pm('model').notes).toEqual(['… +2 models']);
+  });
+  it('прежние меню — один выбор, без вкладок и оси', () => {
+    for (const n of ['permission-bash', 'permission-write', 'trust']) {
+      const m = pm(n);
+      expect([m.kind, m.tabs, m.axis]).toEqual(['single', null, null]);
+    }
+  });
 });

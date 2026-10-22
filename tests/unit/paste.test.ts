@@ -35,6 +35,7 @@ describe('keyBytes', () => {
     expect(keyBytes('shift-tab')).toBe('\x1b[Z');
   });
   it('цифра', () => expect(keyBytes('7')).toBe('7'));
+  it('пробел — отметка в множественном выборе', () => expect(keyBytes('space')).toBe(' '));
   it('неизвестная клавиша — ошибка', () => expect(() => keyBytes('rm -rf' as never)).toThrow());
   it('0 не из списка', () => expect(() => keyBytes('0' as never)).toThrow());
   it('не строка — ошибка, даже если toString похож на клавишу', () => {

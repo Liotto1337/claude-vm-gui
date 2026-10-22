@@ -3,7 +3,7 @@ import type { ChatEvent, ChatItem, ScreenState } from '../../src/shared/ipc';
 import { mergeItems, viewMode } from '../../src/renderer/view-mode';
 
 const prompt: ScreenState = { kind: 'prompt', status: null, input: '' };
-const menu: ScreenState = { kind: 'menu', menu: { title: 'x', context: [], code: [], options: [], notes: [], hint: null } };
+const menu: ScreenState = { kind: 'menu', menu: { title: 'x', context: [], code: [], options: [], notes: [], hint: null, kind: 'single', tabs: null, axis: null } };
 const base = { claudeRunning: true, screen: prompt as ScreenState | null, unavailable: false, override: null as 'terminal' | null };
 
 describe('viewMode', () => {

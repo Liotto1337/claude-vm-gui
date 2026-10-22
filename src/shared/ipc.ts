@@ -127,10 +127,18 @@ export type LayoutItem =
   | { kind: 'group'; id: string; name: string; pinned?: boolean; collapsed?: boolean; sessions: { name: string; pinned?: boolean }[] };
 
 /** Клавиши, которые интерфейс может отправить в claude (карточка меню, «Остановить»). */
-export type MenuKey = 'up' | 'down' | 'left' | 'right' | 'enter' | 'esc' | 'tab' | 'shift-tab'
+export type MenuKey = 'up' | 'down' | 'left' | 'right' | 'enter' | 'esc' | 'tab' | 'shift-tab' | 'space'
   | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9';
 
-export interface MenuOption { n: number | null; label: string; description: string; selected: boolean }
+export interface MenuOption {
+  n: number | null; label: string; description: string; selected: boolean;
+  /** множественный выбор: отмечен ли вариант («[✔]») */
+  checked?: boolean;
+  /** «Type something.» — свой ответ: набранный текст встаёт на место подписи */
+  input?: boolean;
+  /** «Submit» под вариантами множественного выбора */
+  submit?: boolean;
+}
 /** Меню Claude Code, разобранное с экрана: запрос разрешения, AskUserQuestion, /model и т. п. */
 export interface ParsedMenu {
   title: string;
@@ -140,6 +148,12 @@ export interface ParsedMenu {
   options: MenuOption[];
   notes: string[];
   hint: string | null;
+  /** multi — чекбоксы (AskUserQuestion с multiSelect) */
+  kind: 'single' | 'multi';
+  /** Вкладки вопросов AskUserQuestion («←  ☐ Цвет  ☐ Размер  ✔ Submit  →»): вопросы без Submit, текущий */
+  tabs: { labels: string[]; current: number } | null;
+  /** Дополнительная ось, меняется ←/→ (effort в /model) */
+  axis: { label: string; value: string } | null;
 }
 export type ScreenState =
   | { kind: 'no-claude' }
