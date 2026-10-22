@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { ChatItem } from '../../src/shared/ipc';
-import { newParseState, parseTranscriptLines } from '../../src/shared/transcript-parse';
+import { newParseState, parseTranscriptLines, unwrapPasted } from '../../src/shared/transcript-parse';
 
 // Синтетический журнал в форме настоящего (Claude Code 2.1.303)
 const LINES = readFileSync(join(__dirname, '../fixtures/transcript.jsonl'), 'utf8').split('\n').filter(Boolean);
@@ -91,6 +91,31 @@ describe('parseTranscriptLines', () => {
   it('путь к картинке из uploads среди текста', () => {
     const line = JSON.stringify({ type: 'user', uuid: 'p', message: { role: 'user', content: 'глянь /root/.cache/claude-vm-gui/uploads/1-a.png пожалуйста' } });
     expect(parseAll([line]).changed[0]).toMatchObject({ text: 'глянь пожалуйста', images: 1 });
+  });
+});
+
+describe('сводка сжатия и pasted_content', () => {
+  const parse = (lines: string[]) => parseTranscriptLines(lines, newParseState());
+  it('сводка сжатия контекста в ленту не попадает', () => {
+    const line = JSON.stringify({
+      type: 'user', isCompactSummary: true, isVisibleInTranscriptOnly: true, uuid: 'u1',
+      message: { role: 'user', content: 'This session is being continued from a previous conversation…' },
+    });
+    expect(parse([line]).changed).toEqual([]);
+  });
+  it('unwrapPasted: пара тегов с id и без, несколько вставок', () => {
+    expect(unwrapPasted('до\n<pasted_content id="c1">\na\nb\n</pasted_content id="c1">\nпосле')).toBe('до\na\nb\nпосле');
+    expect(unwrapPasted('<pasted_content>\nx\n</pasted_content>')).toBe('x');
+    expect(unwrapPasted('<pasted_content id="1">\na\n</pasted_content id="1"> и <pasted_content id="2">\nb\n</pasted_content id="2">')).toBe('a и b');
+  });
+  it('unwrapPasted: непарные и разные id не трогаются', () => {
+    expect(unwrapPasted('a </pasted_content id="z"> b')).toBe('a </pasted_content id="z"> b');
+    expect(unwrapPasted('<pasted_content id="a">\nx\n</pasted_content id="b">')).toBe('<pasted_content id="a">\nx\n</pasted_content id="b">');
+  });
+  it('сообщение с обёрнутой вставкой — только текст вставки', () => {
+    const str = JSON.stringify({ type: 'user', uuid: 's', message: { role: 'user', content: '<pasted_content id="c1">\na\nb\n</pasted_content id="c1">' } });
+    const blk = JSON.stringify({ type: 'user', uuid: 'b', message: { role: 'user', content: [{ type: 'text', text: '<pasted_content id="c2">\nc\nd\n</pasted_content id="c2">' }] } });
+    expect(parse([str, blk]).changed).toMatchObject([{ kind: 'user', text: 'a\nb' }, { kind: 'user', text: 'c\nd' }]);
   });
 });
 

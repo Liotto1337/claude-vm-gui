@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ChatItem } from '../../src/shared/ipc';
+import { newParseState, parseTranscriptLines } from '../../src/shared/transcript-parse';
 import { claimPending, nextTyping, revealCount, typingSpeed, TYPE_MAX_CHARS, type Pending } from '../../src/renderer/chat-anim';
 
 describe('«печать» ответа', () => {
@@ -95,5 +96,14 @@ describe('пузыри: слеш-команды и очередь', () => {
     expect(q.map((x) => x.id)).toEqual(['3']);
     q = claimPending(q, [u('a', 'ок'), u('b', 'ок'), u('c', 'ок')], 240_000, false);
     expect(q).toEqual([]);
+  });
+});
+
+describe('claimPending и многострочная вставка', () => {
+  it('пузырь отправленного многострочного текста забирается записью с pasted_content', () => {
+    const line = JSON.stringify({ type: 'user', uuid: 'm1', message: { role: 'user', content: '<pasted_content id="c1">\nстрока 1\nстрока 2\n</pasted_content id="c1">' } });
+    const items = parseTranscriptLines([line], newParseState()).changed;
+    const pend: Pending[] = [{ id: 'p1', text: 'строка 1\nстрока 2', images: 0, state: 'sent', seen: new Set(), at: 1 }];
+    expect(claimPending(pend, items, 2)).toEqual([]);
   });
 });

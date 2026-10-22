@@ -49,6 +49,43 @@ function stripUploads(text: string): { text: string; images: number } {
   return { text: kept.join('').replace(/[ \t]{2,}/g, ' '), images };
 }
 
+const PASTED_OPEN = '<pasted_content';
+
+/**
+ * Claude Code пишет многострочную вставку обёрнутой: `<pasted_content id="c1">\n…\n</pasted_content id="c1">`
+ * (бывает и без id). Пара тегов с одинаковым атрибутом заменяется содержимым; непарные теги остаются как есть.
+ * Поиск через indexOf — без регулярки по всему (возможно, огромному) тексту.
+ */
+export function unwrapPasted(text: string): string {
+  if (!text.includes(PASTED_OPEN)) return text;
+  let out = '';
+  let pos = 0;
+  for (;;) {
+    const open = text.indexOf(PASTED_OPEN, pos);
+    if (open < 0) break;
+    const end = text.indexOf('>', open);
+    const attr = end < 0 ? null : text.slice(open + PASTED_OPEN.length, end);
+    if (attr === null || !/^(?: id="[^"]*")?$/.test(attr)) {
+      out += text.slice(pos, open + 1);
+      pos = open + 1;
+      continue;
+    }
+    const closeTag = `</pasted_content${attr}>`;
+    const close = text.indexOf(closeTag, end + 1);
+    if (close < 0) {
+      out += text.slice(pos, end + 1);
+      pos = end + 1;
+      continue;
+    }
+    let inner = text.slice(end + 1, close);
+    if (inner.startsWith('\n')) inner = inner.slice(1);
+    if (inner.endsWith('\n')) inner = inner.slice(0, -1);
+    out += text.slice(pos, open) + inner;
+    pos = close + closeTag.length;
+  }
+  return out + text.slice(pos);
+}
+
 function clipResult(text: string): string {
   const lines = text.split('\n');
   let out = lines.length > MAX_RESULT_LINES ? `${lines.slice(0, MAX_RESULT_LINES).join('\n')}\n… ещё ${lines.length - MAX_RESULT_LINES} строк` : text;
@@ -214,6 +251,8 @@ function parseLines(lines: string[], st: ParseState): { changed: ChatItem[]; bad
     }
     if (rec.type !== 'user' && rec.type !== 'assistant') continue;
     if (rec.isMeta === true) continue;
+    // Сводка сжатия контекста («This session is being continued…») и прочее только для журнала — не реплики
+    if (rec.isCompactSummary === true || rec.isVisibleInTranscriptOnly === true) continue;
     const msg = rec.message as { content?: unknown } | undefined;
     const content = msg?.content;
 
@@ -232,7 +271,7 @@ function parseLines(lines: string[], st: ParseState): { changed: ChatItem[]; bad
           put(sp);
           continue;
         }
-        const u = stripUploads(content);
+        const u = stripUploads(unwrapPasted(content));
         put({ kind: 'user', id, text: u.text.trim(), images: u.images });
         continue;
       }
@@ -253,7 +292,7 @@ function parseLines(lines: string[], st: ParseState): { changed: ChatItem[]; bad
         put(sp);
         continue;
       }
-      const u = stripUploads(joined.replace(/\[Image #\d+\]\s*/g, ''));
+      const u = stripUploads(unwrapPasted(joined).replace(/\[Image #\d+\]\s*/g, ''));
       put({ kind: 'user', id, text: u.text.trim(), images: images + u.images });
       continue;
     }
