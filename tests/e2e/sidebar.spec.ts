@@ -325,3 +325,34 @@ test('перетаскивание на другую страницу перен
     await app.close();
   }
 });
+
+test('«q у р» не обрезаются в строке сессии', async () => {
+  // Высота строки текста не зависит от шрифта (normal у Segoe UI и Roboto выше, чем у шрифтов Linux),
+  // хвосты букв помещаются в строку (≥ 1,3 кегля), всё вместе — в строку сессии
+  execFileSync('mkdir', ['-p', '/tmp/qypдру']);
+  tmux('new-session', '-d', '-s', 'cvg-test-qyp', '-c', '/tmp/qypдру');
+  const { app, page } = await open();
+  try {
+    const row = item(page, 'cvg-test-qyp');
+    await expect(row).toBeVisible({ timeout: 10_000 });
+    await expect(row.locator('.session-cwd')).toContainText('qyp');
+    const m = await row.evaluate((el) => {
+      const cs = getComputedStyle(el);
+      const inner = el.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+      const parts = [...el.querySelectorAll<HTMLElement>('.session-name, .session-cwd')].map((p) => {
+        const s = getComputedStyle(p);
+        return { lh: s.lineHeight, font: parseFloat(s.fontSize) };
+      });
+      return { inner, gap: parseFloat(cs.rowGap) || 0, parts };
+    });
+    let need = m.gap * (m.parts.length - 1);
+    for (const p of m.parts) {
+      expect(p.lh).not.toBe('normal');
+      expect(parseFloat(p.lh)).toBeGreaterThanOrEqual(1.3 * p.font - 0.01);
+      need += parseFloat(p.lh);
+    }
+    expect(need).toBeLessThanOrEqual(m.inner + 0.5);
+  } finally {
+    await app.close();
+  }
+});

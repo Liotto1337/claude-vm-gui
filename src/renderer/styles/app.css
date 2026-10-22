@@ -139,7 +139,7 @@
 .session-box { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .session-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; overflow: hidden; flex: 1; min-height: 0; }
 .session-list > li { flex: none; position: relative; box-sizing: border-box; }
-.row-session { height: 52px; padding: 1px 0; }
+.row-session { height: 56px; padding: 1px 0; }
 .session-list > li[hidden] { display: none; }
 .row-session.in-group { padding-left: 14px; }
 .row-session.in-group .session-item { border-left: 0.5px solid var(--border); border-radius: 0 8px 8px 0; }
@@ -174,8 +174,8 @@
 .session-item[aria-current='page'] { background: var(--hover); }
 .session-item[aria-current='page'] .session-name { font-weight: 600; }
 .session-line { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.session-name { flex: 1; }
-.session-cwd { font-size: 12px; color: var(--text-2); padding-left: 14px; }
+.session-name { flex: 1; line-height: 1.35; }
+.session-cwd { font-size: 12px; line-height: 1.35; color: var(--text-2); padding-left: 14px; }
 .tag { font-size: 11px; color: var(--text-2); border: 0.5px solid var(--border-strong); border-radius: 4px; padding: 1px 5px; white-space: nowrap; }
 .settings-btn { margin-top: auto; }
 
