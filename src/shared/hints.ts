@@ -52,6 +52,18 @@ export const BUILTIN_COMMANDS: HintCommand[] = [
   builtin('memory', 'Редактировать файлы памяти CLAUDE.md'),
   builtin('doctor', 'Проверить установку Claude Code'),
   builtin('bug', 'Сообщить об ошибке'),
+  // С Claude Code 2.1.306 initialize отдаёт только скиллы и команды плагинов
+  builtin('model', 'Сменить модель', '[модель]'),
+  builtin('effort', 'Уровень усилий модели', '[уровень]'),
+  builtin('compact', 'Сжать историю беседы', '[инструкции]'),
+  builtin('context', 'Заполнение контекста'),
+  builtin('config', 'Настройки Claude Code'),
+  builtin('init', 'Создать CLAUDE.md для проекта'),
+  builtin('agents', 'Субагенты'),
+  builtin('mcp', 'Серверы MCP'),
+  builtin('add-dir', 'Добавить рабочую папку', '<путь>'),
+  builtin('rewind', 'Откатить беседу и код'),
+  builtin('export', 'Экспорт беседы', '[файл]'),
 ];
 
 interface RawCommand { name?: unknown; description?: unknown; argumentHint?: unknown }

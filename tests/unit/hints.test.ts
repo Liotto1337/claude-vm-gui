@@ -46,3 +46,12 @@ describe('parseInitialize', () => {
   });
   it('мусор на входе — пустой ответ без падения', () => expect(parseInitialize({ x: 1 })).toEqual({ commands: BUILTIN_COMMANDS, models: [] }));
 });
+
+describe('parseInitialize: Claude Code 2.1.306 не отдаёт встроенные команды', () => {
+  // В ответе только скиллы и команды плагинов
+  const hints = parseInitialize({ response: { response: { commands: [{ name: 'superpowers:brainstorming', description: 'x' }] } } });
+  const names = hints.commands.map((c) => c.name);
+  it('/model, /effort и /compact всё равно есть в подсказках', () =>
+    expect(names).toEqual(expect.arrayContaining(['model', 'effort', 'compact'])));
+  it('у /model — подсказка аргумента', () => expect(hints.commands.find((c) => c.name === 'model')?.argumentHint).toBe('[модель]'));
+});
