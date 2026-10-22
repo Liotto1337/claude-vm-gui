@@ -60,6 +60,7 @@ const api: Api = {
     onUnavailable: on('chat:unavailable'),
     loadEarlier: invoke('chat:loadEarlier'),
     key: invoke('chat:key'),
+    typeText: invoke('chat:typeText'),
   } as Api['chat'],
   updates: {
     get: invoke('updates:get'),

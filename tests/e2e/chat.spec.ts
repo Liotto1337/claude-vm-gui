@@ -89,12 +89,15 @@ test('меню: карточка, стрелка вниз и Enter выбира�
     await expect(feed(page)).toBeVisible({ timeout: 15_000 });
     await composer(page).fill('menu');
     await composer(page).press('Enter');
-    const card = page.getByRole('group', { name: 'Выбор' });
+    // Карточка — последним элементом ленты, варианты — радиокнопки; над полем ввода карточки нет
+    const card = feed(page).getByRole('group', { name: 'Выбор' });
     await expect(card).toBeVisible({ timeout: 10_000 });
-    await expect(card.getByRole('option', { name: /Да и не спрашивать/ })).toBeVisible();
+    await expect(page.locator('.menu-layer')).toHaveCount(0);
+    expect(await card.evaluate((el) => !el.nextElementSibling || el.nextElementSibling.classList.contains('chat-status'))).toBe(true);
+    await expect(card.getByRole('radiogroup').getByRole('radio', { name: /Да и не спрашивать/ })).toBeVisible();
     await expect(composer(page)).toBeDisabled();
     await page.keyboard.press('ArrowDown');
-    await expect(card.getByRole('option', { name: /Да и не спрашивать/ })).toHaveAttribute('aria-selected', 'true', { timeout: 5000 });
+    await expect(card.getByRole('radio', { name: /Да и не спрашивать/ })).toHaveAttribute('aria-checked', 'true', { timeout: 5000 });
     await page.keyboard.press('Enter');
     await expect(card).toBeHidden({ timeout: 5000 });
     await expect(feed(page).getByText('выбран 2')).toBeVisible({ timeout: 10_000 });
@@ -211,8 +214,8 @@ test('меню: клик по варианту', async () => {
     await expect(feed(page)).toBeVisible({ timeout: 15_000 });
     await composer(page).fill('menu');
     await composer(page).press('Enter');
-    const card = page.getByRole('group', { name: 'Выбор' });
-    await card.getByRole('option', { name: /Нет/ }).click({ timeout: 10_000 });
+    const card = feed(page).getByRole('group', { name: 'Выбор' });
+    await card.getByRole('radio', { name: /Нет/ }).click({ timeout: 10_000 });
     await expect(feed(page).getByText('выбран 3')).toBeVisible({ timeout: 10_000 });
   } finally {
     await app.close();
@@ -438,5 +441,27 @@ test('вложения в ленте: картинка целиком, текс�
   } finally {
     await app.close();
     if (existsSync(UPLOADS)) for (const f of readdirSync(UPLOADS)) if (!before.has(f)) rmSync(join(UPLOADS, f));
+  }
+});
+
+test('множественный выбор в ленте: чекбоксы и «Готово»', async () => {
+  const { app, page } = await open();
+  try {
+    await expect(feed(page)).toBeVisible({ timeout: 15_000 });
+    await composer(page).fill('menu-multi');
+    await composer(page).press('Enter');
+    const card = feed(page).getByRole('group', { name: 'Какие цвета?' });
+    await expect(card).toBeVisible({ timeout: 10_000 });
+    const boxes = card.getByRole('checkbox');
+    await expect(boxes).toHaveCount(3);
+    await expect(card.getByRole('checkbox', { name: /Submit/ })).toHaveCount(0);
+    await card.getByRole('checkbox', { name: /Да и не спрашивать/ }).click();
+    await expect(card.getByRole('checkbox', { name: /Да и не спрашивать/ })).toHaveAttribute('aria-checked', 'true', { timeout: 5000 });
+    await card.getByRole('checkbox', { name: /^Нет/ }).click();
+    await expect(card.getByRole('checkbox', { name: /^Нет/ })).toHaveAttribute('aria-checked', 'true', { timeout: 5000 });
+    await card.getByRole('button', { name: 'Готово' }).click();
+    await expect(feed(page).getByText('выбраны: Да и не спрашивать, Нет')).toBeVisible({ timeout: 10_000 });
+  } finally {
+    await app.close();
   }
 });

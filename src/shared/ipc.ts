@@ -219,6 +219,8 @@ export interface Api {
     onUnavailable(cb: (e: { session: string; reason: string }) => void): Unsubscribe;
     loadEarlier(): Promise<Result<void>>;
     key(k: MenuKey): Promise<Result<void>>;
+    /** Текст в поле своего ответа меню (без Enter) */
+    typeText(text: string): Promise<Result<void>>;
   };
   /** Новая версия на GitHub: get — последняя найденная (событие могло прийти раньше подписки) */
   updates: {

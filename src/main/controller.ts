@@ -73,6 +73,7 @@ export class AppController {
     h.listen('metrics:setActive', (fast: boolean) => this.s?.metrics.setActive(fast === true));
     h.handle('metrics:info', () => this.need((s) => s.metrics.info()));
     h.handle('chat:key', (k: MenuKey) => this.need((s) => s.term.key(k)));
+    h.handle('chat:typeText', (t: string) => this.need((s) => s.term.typeText(t)));
     h.handle('chat:loadEarlier', () => this.need((s) => s.transcript.loadEarlier()));
 
     h.handle('hints:get', (cwd: string) => this.need((s) => s.hints.get(cwd)));

@@ -37,6 +37,17 @@ describe('TerminalService.key', () => {
   });
 });
 
+describe('TerminalService.typeText', () => {
+  it('свой ответ: текст буквально, управляющие символы вырезаны, без Enter, после клавиш очереди', async () => {
+    const { conn, writes } = fakeConn([60, 5]);
+    const term = new TerminalService(conn, {} as TmuxService);
+    expect((await term.open('s', 80, 24)).ok).toBe(true);
+    const [a, b] = await Promise.all([term.key('down'), term.typeText('мой\x1b[B ответ\r')]);
+    expect(a.ok && b.ok).toBe(true);
+    expect(writes).toEqual(['\x1b[B', 'мой [B ответ ']);
+  });
+});
+
 describe('TerminalService.open', () => {
   it('устаревший open (ответ пришёл после более нового) не делает свою сессию текущей', async () => {
     const stream = () => Object.assign(new EventEmitter(), { stderr: new EventEmitter(), write: () => {}, setWindow: () => {}, close: () => {} });

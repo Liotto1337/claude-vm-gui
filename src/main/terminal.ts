@@ -182,6 +182,22 @@ export class TerminalService extends EventEmitter {
     return run;
   }
 
+  /** Свой ответ в меню («Type something.»): текст буквально, без Enter; управляющие символы вырезаются. В той же очереди, что клавиши. */
+  typeText(text: string): Promise<Result<void>> {
+    const run = this.keyQueue.then(async () => {
+      const clean = String(text).replace(/[\x00-\x1f\x7f]/g, ' ');
+      if (!clean) return ok(undefined);
+      await this.opening;
+      if (!this.stream) return fail<void>('NO_SESSION', 'Сессия не открыта');
+      const check = await this.checkWritable(true);
+      if (!check.ok) return check;
+      this.stream?.write(clean);
+      return ok(undefined);
+    });
+    this.keyQueue = run.catch(() => undefined);
+    return run;
+  }
+
   private async keyNow(k: MenuKey): Promise<Result<void>> {
     let bytes: string;
     try {

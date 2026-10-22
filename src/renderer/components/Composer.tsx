@@ -10,7 +10,6 @@ import { AttachmentChip } from './AttachmentChip';
 import { ChoiceMenu } from './ChoiceMenu';
 import { HintPopup, type HintItem } from './HintPopup';
 import { IconArrowUp, IconClip } from './icons';
-import { MenuCard } from './MenuCard';
 
 const FALLBACK_MODELS: ModelInfo[] = [
   { value: 'default', displayName: 'Default', description: '', efforts: [] },
@@ -20,7 +19,7 @@ const FALLBACK_MODELS: ModelInfo[] = [
 const FALLBACK_EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'];
 
 /**
- * Поле ввода. menu — открытое меню Claude Code (карточка над полем, поле неактивно);
+ * Поле ввода. menu — открытое меню Claude Code (карточка в ленте, поле неактивно);
  * working — claude работает (кнопка «Остановить»), chatMode — показана лента, а не терминал.
  */
 export function Composer({ session, menu = null, working = false, chatMode = false }: { session: TmuxSession; menu?: ParsedMenu | null; working?: boolean; chatMode?: boolean }) {
@@ -226,13 +225,6 @@ export function Composer({ session, menu = null, working = false, chatMode = fal
           </button>
         </div>
       ) : null}
-      {/* Карточка всплывает над полем, не меняя раскладку: иначе терминал под лентой стал бы ниже
-          и Claude Code перерисовал бы меню, обрезав его начало */}
-      {menu ? (
-        <div className="menu-layer">
-          <MenuCard menu={menu} />
-        </div>
-      ) : null}
       <div className="composer-anchor">
         <HintPopup items={items} active={active} onPick={pick} />
         <div className="composer">
@@ -258,7 +250,7 @@ export function Composer({ session, menu = null, working = false, chatMode = fal
             rows={2}
             value={text}
             disabled={menuOpen}
-            placeholder={menuOpen ? 'Сначала ответьте на вопрос выше' : 'Напишите сообщение…'}
+            placeholder={menuOpen ? 'Сначала ответьте на вопрос в ленте' : 'Напишите сообщение…'}
             onChange={(e) => {
               setText(e.target.value);
               setCaret(e.target.selectionStart);

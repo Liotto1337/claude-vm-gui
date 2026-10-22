@@ -262,19 +262,20 @@ export function classifyScreen(screen: string): ScreenState {
   return { kind: 'unknown' };
 }
 
-const arrowsTo = (menu: ParsedMenu, index: number): MenuKey[] => {
+/** Стрелки от варианта под курсором до варианта index (без Enter). */
+export const moveKeysFor = (menu: ParsedMenu, index: number): MenuKey[] => {
   const sel = Math.max(0, menu.options.findIndex((o) => o.selected));
   const delta = index - sel;
   return Array<MenuKey>(Math.abs(delta)).fill(delta > 0 ? 'down' : 'up');
 };
 
 /** Множественный выбор: отметить или снять вариант index — стрелки до него и пробел. */
-export const toggleKeysFor = (menu: ParsedMenu, index: number): MenuKey[] => (menu.options[index] ? [...arrowsTo(menu, index), 'space'] : []);
+export const toggleKeysFor = (menu: ParsedMenu, index: number): MenuKey[] => (menu.options[index] ? [...moveKeysFor(menu, index), 'space'] : []);
 
 /** Множественный выбор: «Готово» — стрелки до «Submit» и Enter (дальше Claude Code показывает «Review your answers»). */
 export function submitKeysFor(menu: ParsedMenu): MenuKey[] {
   const i = menu.options.findIndex((o) => o.submit);
-  return i < 0 ? [] : [...arrowsTo(menu, i), 'enter'];
+  return i < 0 ? [] : [...moveKeysFor(menu, i), 'enter'];
 }
 
 /** Клавиши для выбора варианта index: цифра, если у варианта есть номер, иначе стрелки от выбранного и Enter. */
@@ -282,5 +283,5 @@ export function menuKeysFor(menu: ParsedMenu, index: number): MenuKey[] {
   const opt = menu.options[index];
   if (!opt) return [];
   if (opt.n !== null && opt.n >= 1 && opt.n <= 9) return [String(opt.n) as MenuKey];
-  return [...arrowsTo(menu, index), 'enter'];
+  return [...moveKeysFor(menu, index), 'enter'];
 }

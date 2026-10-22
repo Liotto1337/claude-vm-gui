@@ -3,6 +3,7 @@ import { displayName, isImageName } from '@shared/upload-name';
 import { api } from '../api';
 import { typingDone, useAppState } from '../state';
 import { ChatItemView } from './ChatItemView';
+import { MenuCard } from './MenuCard';
 import { IconFile, IconImage } from './icons';
 import { Spinner } from './Spinner';
 
@@ -15,6 +16,7 @@ export function ChatView({ session }: { session: string }) {
   const items = chat?.items ?? [];
   const status = chat?.screen?.kind === 'prompt' ? chat.screen.status : null;
   const working = status !== null || (!!chat?.busy && chat.screen?.kind !== 'menu');
+  const menu = chat?.screen?.kind === 'menu' ? chat.screen.menu : null;
   const pending = chat?.pending ?? [];
   const typing = chat?.typing ?? {};
   // Пока ответ «печатается», лента следит за низом
@@ -24,6 +26,7 @@ export function ChatView({ session }: { session: string }) {
   // Пользователь сам ушёл вверх (колесо, клавиши): слежение за низом — только когда докрутит до самого низа
   const userUp = useRef(false);
   const sentIds = useRef(new Set(pending.map((p) => p.id)));
+  const hadMenu = useRef(false);
   const restore = useRef<number | null>(null);
   const [behind, setBehind] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -37,8 +40,9 @@ export function ChatView({ session }: { session: string }) {
       restore.current = null;
       return;
     }
-    // Своё новое сообщение — вниз, где бы ни была лента (как на claude.ai)
-    const fresh = pending.some((p) => !sentIds.current.has(p.id));
+    // Своё новое сообщение и вопрос Claude Code — вниз, где бы ни была лента (как на claude.ai)
+    const fresh = pending.some((p) => !sentIds.current.has(p.id)) || (menu !== null && !hadMenu.current);
+    hadMenu.current = menu !== null;
     sentIds.current = new Set(pending.map((p) => p.id));
     if (fresh) {
       atBottom.current = true;
@@ -47,7 +51,7 @@ export function ChatView({ session }: { session: string }) {
     }
     if (atBottom.current) el.scrollTop = el.scrollHeight;
     else setBehind(true);
-  }, [items, status, pending, tick]);
+  }, [items, status, pending, tick, menu]);
 
   // Содержимое растёт само («печать» ответа) — держим низ, если пользователь внизу
   const inner = useRef<HTMLDivElement>(null);
@@ -125,6 +129,7 @@ export function ChatView({ session }: { session: string }) {
             {p.text ? <span className="bubble-text">{p.text}</span> : null}
           </div>
         ))}
+        {menu ? <MenuCard menu={menu} /> : null}
         {working ? (
           <div className="chat-status" role="status">
             <Spinner /> {status ?? 'Claude работает…'}

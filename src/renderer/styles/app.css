@@ -302,9 +302,18 @@ button.file-row { cursor: pointer; }
 .menu-context.mono { color: var(--text); }
 .menu-options { display: flex; flex-direction: column; gap: 2px; }
 .menu-option { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 4px 10px; border-radius: 8px; cursor: pointer; }
-.menu-option:hover, .menu-option[aria-selected='true'] { background: var(--hover); }
-.menu-num { flex: none; width: 22px; height: 22px; box-sizing: border-box; border-radius: 6px; border: 0.5px solid var(--border-strong); color: var(--text-2); font-size: 12px; display: flex; align-items: center; justify-content: center; }
-.menu-num-on { background: var(--btn-dark-bg); color: var(--btn-dark-text); border-color: transparent; }
+.menu-option:hover, .menu-option.is-cursor { background: var(--hover); }
+.menu-radio, .menu-check { flex: none; width: 18px; height: 18px; box-sizing: border-box; border: 1.5px solid var(--border-strong); display: flex; align-items: center; justify-content: center; }
+.menu-radio { border-radius: 50%; }
+.menu-radio.is-on { border-color: var(--btn-dark-bg); }
+.menu-radio.is-on::after { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--btn-dark-bg); }
+.menu-check { border-radius: 5px; }
+.menu-check.is-on { background: var(--btn-dark-bg); border-color: transparent; }
+.menu-check.is-on::after { content: ''; width: 5px; height: 9px; margin-top: -2px; border: solid var(--btn-dark-text); border-width: 0 2px 2px 0; transform: rotate(45deg); }
+.menu-own { flex: 1; min-width: 0; }
+.menu-axis { display: flex; align-items: center; gap: 8px; padding: 0 4px; font-size: 13px; }
+.menu-foot { display: flex; align-items: center; gap: 12px; }
+.menu-foot .menu-hint { flex: 1; }
 .menu-label { flex: 1; min-width: 0; }
 .menu-notes, .menu-hint { padding: 0 4px; }
 .menu-hint { text-align: right; }
@@ -347,8 +356,6 @@ button.file-row { cursor: pointer; }
 .procs thead th { background: var(--sidebar); }
 .procs th:not(:first-child), .procs td:not(:first-child) { text-align: right; }
 
-.menu-layer { position: absolute; left: 24px; right: 24px; bottom: 100%; z-index: 8; display: flex; justify-content: center; padding-bottom: 4px; pointer-events: none; }
-.menu-layer .menu-card { pointer-events: auto; max-height: min(60vh, 520px); overflow-y: auto; }
 
 /* ── Последние штрихи (0.2.1) ── */
 .bubble.is-sending { background: color-mix(in srgb, var(--bubble) 86%, #000); }
