@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { SessionWatcher } from '../../src/main/session-watch';
 import { SshConnection } from '../../src/main/ssh';
 import { TerminalService } from '../../src/main/terminal';
-import { TmuxService } from '../../src/main/tmux';
+import { tmuxCmd, TmuxService } from '../../src/main/tmux';
 import type { ScreenState } from '../../src/shared/ipc';
 import type { ClaudeSessionInfo } from '../../src/shared/claude-session';
 import { hasTestKey, tempKnownHosts, testConfig, testSessionName } from './helpers';
@@ -20,6 +20,9 @@ describe.skipIf(!hasTestKey)('наблюдение за сессией', () => {
   const claudeDir = mkdtempSync(join(tmpdir(), 'cvg-cd-'));
 
   beforeAll(async () => {
+    // Свой сервер tmux: при window-size latest новая сессия общего сервера получает размер чужого клиента
+    // (например, телефона в 43 колонки) — разделитель поля ввода переносится, и экран не распознаётся
+    process.env.CVG_TMUX_SOCKET = `cvg-test-sw-${Math.random().toString(16).slice(2, 8)}`;
     conn = new SshConnection(testConfig(), { knownHostsPath: tempKnownHosts(), askHostKey: async () => true });
     expect((await conn.connect()).ok).toBe(true);
     tmux = new TmuxService(conn);
@@ -27,6 +30,8 @@ describe.skipIf(!hasTestKey)('наблюдение за сессией', () => {
   afterAll(async () => {
     delete process.env.CVG_CLAUDE_CMD;
     for (const n of created) await tmux.kill(n);
+    await conn.exec(`${tmuxCmd()} kill-server 2>/dev/null`);
+    delete process.env.CVG_TMUX_SOCKET;
     conn.close();
   });
 
@@ -86,7 +91,7 @@ describe.skipIf(!hasTestKey)('наблюдение за сессией', () => {
   it('claude — сам процесс панели (без оболочки): тоже prompt', async () => {
     const name = testSessionName('sw-direct');
     created.push(name);
-    await conn.exec(`tmux new-session -d -s ${name} -x 100 -y 30 'CVG_CLAUDE_DIR=${claudeDir} node ${FAKE}'`);
+    await conn.exec(`${tmuxCmd()} new-session -d -s ${name} -x 100 -y 30 'CVG_CLAUDE_DIR=${claudeDir} node ${FAKE}'`);
     const w = new SessionWatcher(conn, { claudeDir, intervalMs: 200 });
     const states: string[] = [];
     w.on('screen', (e) => states.push(e.state.kind));
@@ -117,7 +122,7 @@ describe.skipIf(!hasTestKey)('наблюдение за сессией', () => {
   it('claude запущен, а файла сессии нет — событие с running=true', async () => {
     const name = testSessionName('sw-nofile');
     created.push(name);
-    await conn.exec(`tmux new-session -d -s ${name} -x 100 -y 30 'node ${FAKE}'`);
+    await conn.exec(`${tmuxCmd()} new-session -d -s ${name} -x 100 -y 30 'node ${FAKE}'`);
     const w = new SessionWatcher(conn, { claudeDir, intervalMs: 200 });
     const events: [ClaudeSessionInfo | null, boolean][] = [];
     w.on('claude', (c, running) => events.push([c, running]));

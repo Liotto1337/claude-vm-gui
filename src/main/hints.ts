@@ -26,8 +26,8 @@ export class HintsService {
     if (!this.conn.connected) return fail('NOT_CONNECTED', 'Нет подключения к ВМ');
     // Только настройки пользователя и без MCP проекта: папка может быть чужой, а её хуки выполнились бы
     const claude = `${shellQuote(this.claudeBin)} -p --input-format stream-json --output-format stream-json --verbose --no-session-persistence --setting-sources user --strict-mcp-config`;
-    // Login-оболочка: так на большинстве ВМ в PATH есть ~/.local/bin, куда ставится claude
-    const cmd = `${cdPrefix(cwd)} && bash -lc ${shellQuote(claude)}`;
+    // Login-оболочка — PATH из ~/.profile; ~/.local/bin (туда ставится claude) часто добавляется только в .bashrc
+    const cmd = `${cdPrefix(cwd)} && bash -lc ${shellQuote(`PATH="$HOME/.local/bin:$PATH"; ${claude}`)}`;
     const request = JSON.stringify({ type: 'control_request', request_id: 'cvg-init', request: { subtype: 'initialize' } });
     let hints: Hints = { commands: BUILTIN_COMMANDS, models: [] };
     try {
