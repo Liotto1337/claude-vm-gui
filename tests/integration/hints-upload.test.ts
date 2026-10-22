@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -117,18 +117,28 @@ describe.skipIf(!hasTestKey)('подсказки и загрузка карти�
   it('картинка загружается по SFTP с прогрессом', async () => {
     const progress: UploadProgress[] = [];
     upload.on('progress', (p: UploadProgress) => progress.push(p));
-    const r = await upload.image('img-1', new Uint8Array(PNG), 'png');
+    const r = await upload.file('img-1', new Uint8Array(PNG), 'image.png');
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     uploaded.push(r.data.remotePath);
-    expect(r.data.remotePath).toMatch(new RegExp(`^${UPLOADS}/\\d{8}-\\d{6}-[0-9a-f]{6}\\.png$`));
+    expect(r.data.remotePath).toMatch(new RegExp(`^${UPLOADS}/\\d{8}-\\d{6}-[0-9a-f]{6}-image\\.png$`));
     expect(statSync(r.data.remotePath).size).toBe(PNG.length);
     expect(progress.at(-1)).toEqual({ id: 'img-1', sent: PNG.length, total: PNG.length });
   });
 
-  it('больше 20 МБ — UPLOAD_TOO_BIG без загрузки', async () => {
-    const r = await upload.image('big', new Uint8Array(20 * 1024 * 1024 + 1), 'png');
-    expect(r).toMatchObject({ ok: false, error: { code: 'UPLOAD_TOO_BIG' } });
+  it('любой файл: исходное имя без пробелов, права 600', async () => {
+    const r = await upload.file('f-1', new TextEncoder().encode('# заметка'), 'мои notes.md');
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    uploaded.push(r.data.remotePath);
+    expect(r.data.remotePath).toMatch(new RegExp(`^${UPLOADS}/\\d{8}-\\d{6}-[0-9a-f]{6}-мои_notes\\.md$`));
+    expect(statSync(r.data.remotePath).mode & 0o777).toBe(0o600);
+    expect(readFileSync(r.data.remotePath, 'utf8')).toBe('# заметка');
+  });
+
+  it('больше 50 МБ — UPLOAD_TOO_BIG без загрузки', async () => {
+    const r = await upload.file('big', new Uint8Array(50 * 1024 * 1024 + 1), 'big.bin');
+    expect(r).toMatchObject({ ok: false, error: { code: 'UPLOAD_TOO_BIG', message: 'Файл больше 50 МБ' } });
   });
 
   it('чистка удаляет файлы старше 7 дней', async () => {

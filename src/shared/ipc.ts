@@ -89,8 +89,6 @@ export interface UploadProgress {
   total: number;
 }
 
-export type ImageExt = 'png' | 'jpg' | 'gif' | 'webp';
-
 /** Замер параметров ВМ (панель «Сервер»). Байты и байт/с; null — нет данных. */
 export interface MetricsSample {
   t: number;
@@ -173,7 +171,7 @@ export interface Api {
     resize(cols: number, rows: number): void;
     onData(cb: (d: string) => void): Unsubscribe;
     onExit(cb: (reason: ExitReason) => void): Unsubscribe;
-    send(text: string, imagePaths: string[]): Promise<Result<void>>;
+    send(text: string, filePaths: string[]): Promise<Result<void>>;
     setModel(value: string): Promise<Result<void>>;
     setEffort(level: string): Promise<Result<void>>;
   };
@@ -183,7 +181,8 @@ export interface Api {
     dirs(partial: string): Promise<Result<string[]>>;
   };
   upload: {
-    image(id: string, bytes: Uint8Array, ext: ImageExt): Promise<Result<{ remotePath: string }>>;
+    /** Любой файл до 50 МБ в папку загрузок на ВМ; name — исходное имя (войдёт в имя на ВМ) */
+    file(id: string, bytes: Uint8Array, name: string): Promise<Result<{ remotePath: string }>>;
     onProgress(cb: (p: UploadProgress) => void): Unsubscribe;
   };
   clipboard: { read(): Promise<string>; write(text: string): void };

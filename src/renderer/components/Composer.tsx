@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent } from 'react';
 import { detectTrigger, filterHints, type Trigger } from '@shared/hints';
-import type { HintCommand, Hints, ImageExt, ModelInfo, ParsedMenu, TmuxSession } from '@shared/ipc';
+import type { HintCommand, Hints, ModelInfo, ParsedMenu, TmuxSession } from '@shared/ipc';
+import { isImageName, MAX_FILE_BYTES } from '@shared/upload-name';
 import { api } from '../api';
 import { addPending, dropPending, markPendingSent, refreshSessions, rememberChoice, useAppState } from '../state';
 import { revoke, type Attachment } from '../attachments';
@@ -11,8 +12,6 @@ import { HintPopup, type HintItem } from './HintPopup';
 import { IconArrowUp, IconClip } from './icons';
 import { MenuCard } from './MenuCard';
 
-const MIME_EXT: Record<string, ImageExt> = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp' };
-const MAX_BYTES = 20 * 1024 * 1024;
 const FALLBACK_MODELS: ModelInfo[] = [
   { value: 'default', displayName: 'Default', description: '', efforts: [] },
   { value: 'opus', displayName: 'Opus', description: '', efforts: [] },
@@ -146,8 +145,10 @@ export function Composer({ session, menu = null, working = false, chatMode = fal
   };
 
   const upload = async (a: Attachment) => {
+    // Слишком большой файл не прочитан — повторять нечего
+    if (a.size > MAX_FILE_BYTES) return;
     setAttachments((list) => list.map((x) => (x.id === a.id ? { ...x, status: 'uploading', percent: 0, error: undefined } : x)));
-    const r = await api.upload.image(a.id, a.bytes, a.ext);
+    const r = await api.upload.file(a.id, a.bytes, a.name);
     setAttachments((list) =>
       list.map((x) =>
         x.id !== a.id ? x : r.ok ? { ...x, status: 'done', percent: 100, remotePath: r.data.remotePath } : { ...x, status: 'error', error: r.error.message },
@@ -157,38 +158,41 @@ export function Composer({ session, menu = null, working = false, chatMode = fal
 
   const addFiles = async (list: File[]) => {
     for (const f of list) {
-      const ext = MIME_EXT[f.type];
-      if (!ext) continue;
-      const id = `img-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
-      const bytes = new Uint8Array(await f.arrayBuffer());
+      const id = `file-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+      // Больше предела — не читаем в память: файл может быть огромным
+      const big = f.size > MAX_FILE_BYTES;
+      const bytes = big ? new Uint8Array(0) : new Uint8Array(await f.arrayBuffer());
+      const name = f.name || 'file';
+      const image = isImageName(name) && f.type.startsWith('image/');
       const a: Attachment = {
         id,
-        name: f.name && f.name !== 'image.png' ? f.name : 'Вставленная картинка',
-        url: URL.createObjectURL(f),
+        name,
+        url: image ? URL.createObjectURL(f) : '',
         bytes,
-        ext,
-        size: bytes.byteLength,
-        status: bytes.byteLength > MAX_BYTES ? 'error' : 'uploading',
+        image,
+        size: f.size,
+        status: big ? 'error' : 'uploading',
         percent: 0,
-        error: bytes.byteLength > MAX_BYTES ? 'больше 20 МБ' : undefined,
+        error: big ? 'больше 50 МБ' : undefined,
       };
       setAttachments((l) => [...l, a]);
       if (a.status === 'uploading') void upload(a);
     }
   };
 
+  // Файлы из буфера (картинка или файлы, скопированные в проводнике); просто текст вставляется как обычно
   const onPaste = (e: ClipboardEvent<HTMLTextAreaElement>) => {
-    const images = [...e.clipboardData.items].filter((i) => i.kind === 'file' && MIME_EXT[i.type]).map((i) => i.getAsFile()).filter((f): f is File => f !== null);
-    if (images.length === 0) return;
+    const files = [...e.clipboardData.items].filter((i) => i.kind === 'file').map((i) => i.getAsFile()).filter((f): f is File => f !== null);
+    if (files.length === 0) return;
     e.preventDefault();
-    void addFiles(images);
+    void addFiles(files);
   };
 
   const onDrop = (e: DragEvent) => {
-    const images = [...e.dataTransfer.files].filter((f) => MIME_EXT[f.type]);
-    if (images.length === 0) return;
+    const files = [...e.dataTransfer.files];
+    if (files.length === 0) return;
     e.preventDefault();
-    void addFiles(images);
+    void addFiles(files);
   };
 
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -265,7 +269,7 @@ export function Composer({ session, menu = null, working = false, chatMode = fal
             onPaste={onPaste}
           />
           <div className="composer-bar">
-            <button type="button" className="icon-btn" aria-label="Прикрепить картинку" onClick={() => fileInput.current?.click()}>
+            <button type="button" className="icon-btn" aria-label="Прикрепить файл" onClick={() => fileInput.current?.click()}>
               <IconClip />
             </button>
             <input
@@ -273,7 +277,6 @@ export function Composer({ session, menu = null, working = false, chatMode = fal
               type="file"
               hidden
               multiple
-              accept="image/png,image/jpeg,image/gif,image/webp"
               onChange={(e) => {
                 void addFiles([...(e.target.files ?? [])]);
                 e.target.value = '';
@@ -316,7 +319,7 @@ export function Composer({ session, menu = null, working = false, chatMode = fal
         </div>
       </div>
       {sendError ? <p className="form-error" role="alert">{sendError}</p> : null}
-      <div className="composer-help">Enter — отправить · Shift+Enter — новая строка · Ctrl+V или перетаскивание — картинка</div>
+      <div className="composer-help">Enter — отправить · Shift+Enter — новая строка · Ctrl+V или перетаскивание — файл</div>
     </div>
   );
 }

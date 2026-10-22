@@ -65,6 +65,12 @@ export const IconImage = () => (
     <path d="M21 17l-5-5-9 8" />
   </svg>
 );
+export const IconFile = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" {...base} strokeWidth="1.8" aria-hidden="true">
+    <path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
+    <path d="M14 3v6h6" />
+  </svg>
+);
 export const IconPin = ({ label, size = 13 }: { label?: string; size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" {...base} strokeWidth="2" role={label ? 'img' : undefined} aria-label={label} aria-hidden={label ? undefined : true}>
     <path d="M9 4h6l-1 6 3 3v2H7v-2l3-3z" />

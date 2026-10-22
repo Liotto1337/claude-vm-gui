@@ -1,6 +1,6 @@
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { fail, ok, type HostKeyPrompt, type ImageExt, type MenuKey, type Result } from '@shared/ipc';
+import { fail, ok, type HostKeyPrompt, type MenuKey, type Result } from '@shared/ipc';
 import { transcriptPath } from '@shared/claude-session';
 import { plural } from '@shared/plural';
 import { HintsService } from './hints';
@@ -78,7 +78,7 @@ export class AppController {
     h.handle('hints:get', (cwd: string) => this.need((s) => s.hints.get(cwd)));
     h.handle('hints:files', (cwd: string) => this.need((s) => s.hints.files(cwd)));
     h.handle('hints:dirs', (partial: string) => this.need((s) => s.hints.dirs(partial)));
-    h.handle('upload:image', (id: string, bytes: Uint8Array, ext: ImageExt) => this.need((s) => s.upload.image(id, bytes, ext)));
+    h.handle('upload:file', (id: string, bytes: Uint8Array, name: string) => this.need((s) => s.upload.file(id, bytes, name)));
   }
 
   private async need<T>(fn: (s: Services) => Promise<Result<T>>): Promise<Result<T>> {

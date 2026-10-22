@@ -1,10 +1,10 @@
-/** Вложение в поле ввода: картинка, загружаемая на ВМ. */
+/** Вложение в поле ввода: файл, загружаемый на ВМ (image — картинка, у неё есть превью url). */
 export interface Attachment {
   id: string;
   name: string;
   url: string;
   bytes: Uint8Array;
-  ext: 'png' | 'jpg' | 'gif' | 'webp';
+  image: boolean;
   status: 'uploading' | 'done' | 'error';
   percent: number;
   size: number;
@@ -12,4 +12,6 @@ export interface Attachment {
   error?: string;
 }
 
-export const revoke = (a: Attachment): void => URL.revokeObjectURL(a.url);
+export const revoke = (a: Attachment): void => {
+  if (a.url) URL.revokeObjectURL(a.url);
+};

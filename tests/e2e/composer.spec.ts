@@ -167,3 +167,22 @@ test('отправка недоступна, пока поле пустое', as
     await app.close();
   }
 });
+
+test('прикрепить любой файл: значок и имя, путь уходит в сообщении', async () => {
+  const { app, page } = await openWith(['cat'], { CVG_FAKE_CLAUDE: '1' });
+  try {
+    await page.locator('input[type=file]').setInputFiles({ name: 'a.txt', mimeType: 'text/plain', buffer: Buffer.from('hello') });
+    const chip = page.locator('.chip', { hasText: 'a.txt' });
+    await expect(chip.getByText('загружено')).toBeVisible({ timeout: 15_000 });
+    await expect(chip.locator('img')).toHaveCount(0);
+    const added = uploads().filter((f) => !uploadsBefore.includes(f));
+    expect(added).toHaveLength(1);
+    expect(added[0]).toMatch(/^\d{8}-\d{6}-[0-9a-f]{6}-a\.txt$/);
+    const box = page.getByLabel('Сообщение для Claude');
+    await box.fill('файл');
+    await box.press('Enter');
+    await expect.poll(() => pane(name), { timeout: 15_000 }).toContain(`файл ${join(UPLOADS, added[0])}`);
+  } finally {
+    await app.close();
+  }
+});

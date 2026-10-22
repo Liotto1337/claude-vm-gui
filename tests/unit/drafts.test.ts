@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Attachment } from '../../src/renderer/attachments';
 import { getDraft, restoreFailed, setDraft } from '../../src/renderer/drafts';
 
-const att = (id: string): Attachment => ({ id, name: `${id}.png`, url: `blob:${id}`, bytes: new Uint8Array(1), ext: 'png', status: 'done', percent: 100, size: 1 });
+const att = (id: string): Attachment => ({ id, name: `${id}.png`, url: `blob:${id}`, bytes: new Uint8Array(1), image: true, status: 'done', percent: 100, size: 1 });
 
 describe('restoreFailed', () => {
   it('пустой черновик — неотправленное возвращается целиком', () => {
