@@ -204,6 +204,11 @@ export class AppController {
   }
 
   /** Только для E2E (CVG_TEST_HOOKS=1): обрыв SSH, как при потере сети. */
+  /** Окно приложения снова в фокусе — окно tmux под размер этого экрана (см. TerminalService.activate) */
+  activate(): void {
+    this.s?.term.activate();
+  }
+
   simulateDrop(): void {
     (this.s?.conn as unknown as { client?: { end(): void } } | undefined)?.client?.end();
   }

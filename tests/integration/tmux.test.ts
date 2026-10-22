@@ -1,7 +1,8 @@
+import { spawn } from 'node:child_process';
 import { mkdirSync, rmSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { SshConnection } from '../../src/main/ssh';
 import { TerminalService } from '../../src/main/terminal';
 import { TmuxService } from '../../src/main/tmux';
@@ -13,6 +14,20 @@ process.env.CVG_FAKE_CLAUDE = '1';
 
 const ODD_DIR = join(homedir(), "cvg test 'q'");
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+// Второе «устройство»: tmux attach в своём PTY 80×30 (как телефон рядом с окном Windows)
+const OTHER_CLIENT = `
+import os, pty, fcntl, termios, struct, sys, select
+pid, fd = pty.fork()
+if pid == 0:
+    os.environ['TERM'] = 'xterm-256color'
+    os.execvp('tmux', ['tmux', 'attach', '-t', '=' + sys.argv[1]])
+fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack('HHHH', 30, 80, 0, 0))
+while True:
+    r, _, _ = select.select([fd], [], [], 1)
+    if r:
+        try: os.read(fd, 65536)
+        except OSError: break
+`;
 
 describe.skipIf(!hasTestKey)('tmux и терминал', () => {
   let conn: SshConnection;
@@ -104,6 +119,26 @@ describe.skipIf(!hasTestKey)('tmux и терминал', () => {
       }),
     ).toBe(true);
     term.close();
+  });
+
+  it('activate: окно tmux принимает размер этого клиента, а не другого устройства', async () => {
+    const name = await newSession('act');
+    const term = new TerminalService(conn, tmux);
+    expect((await term.open(name, 200, 50)).ok).toBe(true);
+    const width = async () => (await conn.exec(`tmux list-windows -t '=${name}' -F '#{window_width}'`)).stdout.trim();
+    expect(await waitFor(async () => (await width()) === '200')).toBe(true);
+    const other = spawn('python3', ['-I', '-c', OTHER_CLIENT, name], { stdio: 'ignore' });
+    try {
+      expect(await waitFor(async () => (await width()) === '80')).toBe(true);
+      const write = vi.spyOn((term as unknown as { stream: { write(d: string): void } }).stream, 'write');
+      term.activate();
+      term.activate();
+      expect(write.mock.calls).toEqual([['\x1b[I']]);
+      expect(await waitFor(async () => (await width()) === '200', 2000)).toBe(true);
+    } finally {
+      other.kill();
+      term.close();
+    }
   });
 
   it('внешний kill-session открытой сессии — exit("killed")', async () => {

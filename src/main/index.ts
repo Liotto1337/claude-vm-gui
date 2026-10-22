@@ -50,7 +50,12 @@ app.whenReady().then(() => {
   hub.registerBase();
   const controller = new AppController(hub);
   controller.register();
-  hub.attach(createWindow());
+  const win = createWindow();
+  hub.attach(win);
+  // Вернулись в окно (с телефона или из другой программы) — tmux подстраивает окно под этот экран
+  win.on('focus', () => controller.activate());
+  win.on('restore', () => controller.activate());
+  win.on('show', () => controller.activate());
   const updates = startUpdates(hub, app.getPath('userData'));
   app.on('before-quit', () => {
     hub.layouts.flush();

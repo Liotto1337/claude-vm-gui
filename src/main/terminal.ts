@@ -78,6 +78,7 @@ export class TerminalService extends EventEmitter {
     }
     this.stream = stream;
     this.session = name;
+    this.lastActivate = 0;
     const decoder = new StringDecoder('utf8');
     stream.on('error', () => {});
     stream.on('data', (d: Buffer) => this.emit('data', decoder.write(d)));
@@ -106,6 +107,20 @@ export class TerminalService extends EventEmitter {
 
   write(data: string): void {
     this.stream?.write(data);
+  }
+
+  private lastActivate = 0;
+
+  /**
+   * Этот клиент становится для tmux последним активным: при window-size latest окно сразу принимает его размер
+   * (а не размер другого устройства, где сессия тоже открыта). «Фокус получен» (ESC [ I) — не ввод:
+   * программа в панели его не получает. resize-window не годится — навсегда переводит окно в ручной размер.
+   */
+  activate(): void {
+    const now = Date.now();
+    if (!this.stream || now - this.lastActivate < 500) return;
+    this.lastActivate = now;
+    this.stream.write('\x1b[I');
   }
 
   resize(cols: number, rows: number): void {
