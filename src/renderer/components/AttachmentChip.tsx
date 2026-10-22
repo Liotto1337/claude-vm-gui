@@ -1,17 +1,6 @@
+import type { Attachment } from '../attachments';
 import { IconImage } from './icons';
 
-export interface Attachment {
-  id: string;
-  name: string;
-  url: string;
-  bytes: Uint8Array;
-  ext: 'png' | 'jpg' | 'gif' | 'webp';
-  status: 'uploading' | 'done' | 'error';
-  percent: number;
-  size: number;
-  remotePath?: string;
-  error?: string;
-}
 
 const kb = (n: number) => (n < 1024 * 1024 ? `${Math.max(1, Math.round(n / 1024))} КБ` : `${(n / 1024 / 1024).toFixed(1)} МБ`);
 

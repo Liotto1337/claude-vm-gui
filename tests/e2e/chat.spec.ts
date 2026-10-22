@@ -373,3 +373,36 @@ test('после щелчка по ленте ↑ во время «печати
     await l.app.close();
   }
 });
+
+test('поле пустеет сразу при отправке; следующее можно набирать, отправить — после доставки', async () => {
+  tmux('new-session', '-d', '-s', 'cvg-test-slow', '-x', '120', '-y', '40', `CVG_FAKE_SLOW_ACCEPT=1 CVG_CLAUDE_DIR=${claudeDir} node ${FAKE}`);
+  const { app, page } = await open('cvg-test-slow');
+  try {
+    await expect(feed(page)).toBeVisible({ timeout: 15_000 });
+    await composer(page).fill('уходит сразу');
+    await composer(page).press('Enter');
+    await expect(composer(page)).toHaveValue('', { timeout: 300 });
+    await expect(feed(page).locator('.bubble.is-sending', { hasText: 'уходит сразу' })).toBeVisible();
+    await composer(page).fill('следующее');
+    await expect(page.getByRole('button', { name: 'Отправить' })).toBeDisabled();
+    await expect(page.getByRole('button', { name: 'Отправить' })).toBeEnabled({ timeout: 10_000 });
+    await expect(composer(page)).toHaveValue('следующее');
+  } finally {
+    await app.close();
+  }
+});
+
+test('в режиме «Терминал» поля ввода нет, черновик возвращается вместе с лентой', async () => {
+  const { app, page } = await open();
+  try {
+    await expect(feed(page)).toBeVisible({ timeout: 15_000 });
+    await composer(page).fill('черновик');
+    await page.getByRole('button', { name: 'Терминал', exact: true }).click();
+    await expect(page.getByRole('region', { name: 'Терминал' })).toBeVisible();
+    await expect(composer(page)).toHaveCount(0);
+    await page.getByRole('button', { name: 'Лента', exact: true }).click();
+    await expect(composer(page)).toHaveValue('черновик');
+  } finally {
+    await app.close();
+  }
+});

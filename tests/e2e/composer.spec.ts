@@ -148,8 +148,10 @@ test('двойной Enter отправляет сообщение один ра
     await box.press('Enter');
     await box.press('Enter');
     await expect(box).toHaveValue('');
+    // Поле пустеет сразу при отправке — ждём, пока сообщение дойдёт (ввод + эхо cat), и ещё немного: второго нет
+    await expect.poll(() => pane(name).match(/ровно-один-раз/g)?.length ?? 0, { timeout: 15_000 }).toBe(2);
     await page.waitForTimeout(1500);
-    expect(pane(name).match(/ровно-один-раз/g)?.length).toBe(2); // ввод + эхо cat
+    expect(pane(name).match(/ровно-один-раз/g)?.length).toBe(2);
   } finally {
     await app.close();
   }

@@ -3,7 +3,9 @@ import { detectTrigger, filterHints, type Trigger } from '@shared/hints';
 import type { HintCommand, Hints, ImageExt, ModelInfo, ParsedMenu, TmuxSession } from '@shared/ipc';
 import { api } from '../api';
 import { addPending, dropPending, markPendingSent, refreshSessions, rememberChoice, useAppState } from '../state';
-import { AttachmentChip, type Attachment } from './AttachmentChip';
+import { revoke, type Attachment } from '../attachments';
+import { getDraft, restoreFailed, setDraft, updateDraft, useDraft } from '../drafts';
+import { AttachmentChip } from './AttachmentChip';
 import { ChoiceMenu } from './ChoiceMenu';
 import { HintPopup, type HintItem } from './HintPopup';
 import { IconArrowUp, IconClip } from './icons';
@@ -26,13 +28,15 @@ export function Composer({ session, menu = null, working = false, chatMode = fal
   const menuOpen = menu !== null;
   const { choices } = useAppState();
   const choice = choices[session.name] ?? {};
-  const [text, setText] = useState('');
+  // Текст и вложения — в черновике сессии: переживают скрытие поля и возвращаются при ошибке отправки
+  const { text, attachments } = useDraft(session.name);
+  const setText = (t: string) => updateDraft(session.name, (d) => ({ ...d, text: t }));
+  const setAttachments = (fn: (l: Attachment[]) => Attachment[]) => updateDraft(session.name, (d) => ({ ...d, attachments: fn(d.attachments) }));
   const [caret, setCaret] = useState(0);
   const [hints, setHints] = useState<Hints | null>(null);
   const [files, setFiles] = useState<string[] | null>(null);
   const [active, setActive] = useState(0);
   const [dismissed, setDismissed] = useState<number | null>(null);
-  const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [sendError, setSendError] = useState<string | null>(null);
   const box = useRef<HTMLTextAreaElement>(null);
   // Карточка меню закрылась (поле снова доступно) и фокус никому не достался — обратно в поле
@@ -121,22 +125,24 @@ export function Composer({ session, menu = null, working = false, chatMode = fal
     if (!canSend || sending.current) return;
     sending.current = true;
     setBusy(true);
-    // Сообщение сразу в ленте (темнее), пока идёт отправка
+    // Сообщение сразу в ленте (темнее), а поле — сразу пустое: можно набирать следующее, пока идёт отправка
+    const sent = getDraft(session.name);
     const pendingId = addPending(session.name, text.trim(), ready.length);
-    const r = await api.term.send(text, ready.map((a) => a.remotePath!)).finally(() => {
+    setDraft(session.name, { text: '', attachments: [] });
+    setTextAndCaret('', 0);
+    const r = await api.term.send(sent.text, ready.map((a) => a.remotePath!)).finally(() => {
       sending.current = false;
       setBusy(false);
     });
     if (!r.ok) {
       dropPending(session.name, pendingId);
       setSendError(r.error.message);
+      restoreFailed(session.name, sent);
       return;
     }
     markPendingSent(session.name, pendingId);
     setSendError(null);
-    for (const a of attachments) URL.revokeObjectURL(a.url);
-    setAttachments([]);
-    setTextAndCaret('', 0);
+    for (const a of sent.attachments) revoke(a);
   };
 
   const upload = async (a: Attachment) => {
@@ -234,7 +240,7 @@ export function Composer({ session, menu = null, working = false, chatMode = fal
                   a={a}
                   onRetry={() => void upload(a)}
                   onRemove={() => {
-                    URL.revokeObjectURL(a.url);
+                    revoke(a);
                     setAttachments((l) => l.filter((x) => x.id !== a.id));
                   }}
                 />

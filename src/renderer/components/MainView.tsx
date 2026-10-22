@@ -37,7 +37,10 @@ export function MainView() {
               <TerminalView key={session.name} name={session.name} hidden={mode === 'chat'} />
               {mode === 'chat' ? <ChatView session={session.name} /> : null}
             </div>
-            <Composer key={`c-${session.name}`} session={session} menu={menu} working={!!c?.busy} chatMode={mode === 'chat'} />
+            {/* Выбрали «Терминал» — ввод прямо в терминале, поле ввода не нужно (черновик сохранится) */}
+            {mode === 'terminal' && viewOverride === 'terminal' ? null : (
+              <Composer key={`c-${session.name}`} session={session} menu={menu} working={!!c?.busy} chatMode={mode === 'chat'} />
+            )}
           </>
         ) : current ? (
           <>
