@@ -4,6 +4,7 @@ import { viewMode } from '../view-mode';
 import { Banner } from './Banner';
 import { ChatView } from './ChatView';
 import { Composer } from './Composer';
+import { UpdateBanner } from './UpdateBanner';
 import { NewSessionDialog } from './NewSessionDialog';
 import { SessionHeader } from './SessionHeader';
 import { ServerPanel } from './ServerPanel';
@@ -26,6 +27,7 @@ export function MainView() {
     <div className="main-layout">
       <Sidebar onNewSession={(group) => setNewSession({ group })} />
       <main className="main-column">
+        <UpdateBanner />
         <Banner />
         {session ? (
           <>

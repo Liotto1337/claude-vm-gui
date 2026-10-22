@@ -61,6 +61,12 @@ const api: Api = {
     loadEarlier: invoke('chat:loadEarlier'),
     key: invoke('chat:key'),
   } as Api['chat'],
+  updates: {
+    get: invoke('updates:get'),
+    onAvailable: on('updates:available'),
+    dismissed: invoke('updates:dismissed'),
+    dismiss: invoke('updates:dismiss'),
+  } as Api['updates'],
   platform: { theme: invoke('platform:theme'), onThemeChange: on('platform:themeChange') } as Api['platform'],
 };
 

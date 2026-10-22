@@ -1,6 +1,7 @@
 import { app, BrowserWindow, safeStorage, session, shell } from 'electron';
 import { join } from 'node:path';
 import { AppController } from './controller';
+import { startUpdates } from './updates';
 import { IpcHub, repoDirForDev } from './ipc';
 
 const CSP = "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:";
@@ -50,8 +51,10 @@ app.whenReady().then(() => {
   const controller = new AppController(hub);
   controller.register();
   hub.attach(createWindow());
+  const updates = startUpdates(hub, app.getPath('userData'));
   app.on('before-quit', () => {
     hub.layouts.flush();
+    updates.stop();
     controller.disconnect();
   });
   if (process.env.CVG_TEST_HOOKS === '1') {

@@ -192,6 +192,11 @@
 
 .banner { display: flex; align-items: center; gap: 12px; margin: 12px 24px 0; padding: 10px 14px; border-radius: 10px; background: color-mix(in srgb, var(--warn) 14%, var(--panel)); border: 0.5px solid var(--border); font-size: 13px; }
 .banner-error { background: color-mix(in srgb, var(--danger) 12%, var(--panel)); }
+/* Обновление: самый яркий цвет темы (глина), тёмный текст — белый на глине читается плохо */
+.banner-update { padding: 0; background: var(--accent); border-color: transparent; color: #141413; font-weight: 600; }
+.banner-update-link { flex: 1; padding: 10px 14px; border: none; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.banner-close { padding: 10px 14px; border: none; background: none; color: inherit; font: inherit; cursor: pointer; }
+.banner-update-link:focus-visible, .banner-close:focus-visible { outline: 2px solid #141413; outline-offset: -4px; border-radius: 8px; }
 
 .popup { list-style: none; margin: 0; padding: 6px; background: var(--panel); border: 0.5px solid var(--border); border-radius: 12px; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 1px; }
 .popup-item { padding: 8px 10px; border-radius: 8px; cursor: pointer; }

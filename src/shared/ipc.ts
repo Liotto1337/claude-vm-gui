@@ -144,6 +144,9 @@ export type ScreenState =
   | { kind: 'prompt'; status: string | null; input: string }
   | { kind: 'menu'; menu: ParsedMenu }
   | { kind: 'unknown' };
+export type { UpdateInfo } from './version';
+import type { UpdateInfo } from './version';
+
 export type ExitReason = 'detached' | 'killed' | 'connection-lost';
 export type Unsubscribe = () => void;
 
@@ -197,6 +200,13 @@ export interface Api {
     onUnavailable(cb: (e: { session: string; reason: string }) => void): Unsubscribe;
     loadEarlier(): Promise<Result<void>>;
     key(k: MenuKey): Promise<Result<void>>;
+  };
+  /** Новая версия на GitHub: get — последняя найденная (событие могло прийти раньше подписки) */
+  updates: {
+    get(): Promise<UpdateInfo | null>;
+    onAvailable(cb: (u: UpdateInfo) => void): Unsubscribe;
+    dismissed(): Promise<string | null>;
+    dismiss(version: string): Promise<void>;
   };
   platform: {
     theme(): Promise<'light' | 'dark'>;

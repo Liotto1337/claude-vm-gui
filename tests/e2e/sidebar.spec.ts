@@ -339,7 +339,7 @@ test('«q у р» не обрезаются в строке сессии', async
     const m = await row.evaluate((el) => {
       const cs = getComputedStyle(el);
       const inner = el.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
-      const parts = [...el.querySelectorAll<HTMLElement>('.session-name, .session-cwd')].map((p) => {
+      const parts = Array.from(el.querySelectorAll<HTMLElement>('.session-name, .session-cwd')).map((p) => {
         const s = getComputedStyle(p);
         return { lh: s.lineHeight, font: parseFloat(s.fontSize) };
       });
