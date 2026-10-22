@@ -38,4 +38,17 @@ describe('итоги меню в состоянии ленты', () => {
     expect(state.getState().chat.A.answers.map((a) => a.text)).toEqual(['Выбор → выбрано: Да']);
     expect(state.getState().chat.B.answers).toEqual([]);
   });
+
+  it('Esc или Ctrl+C, нажатые прямо в терминале приложения, — «отменено», а не вариант под курсором', async () => {
+    const state = await import('../../src/renderer/state');
+    await state.init();
+    onScreen({ session: 'C', state: menuState, busy: false });
+    state.noteTerminalInput('C', '\x1b');
+    onScreen({ session: 'C', state: { kind: 'prompt', status: null, input: '' }, busy: false });
+    expect(state.getState().chat.C.answers.map((a) => a.text)).toEqual(['Выбор → отменено']);
+    onScreen({ session: 'D', state: menuState, busy: false });
+    state.noteTerminalInput('D', '\x03');
+    onScreen({ session: 'D', state: { kind: 'prompt', status: null, input: '' }, busy: false });
+    expect(state.getState().chat.D.answers.map((a) => a.text)).toEqual(['Выбор → отменено']);
+  });
 });

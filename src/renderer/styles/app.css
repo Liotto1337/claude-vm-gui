@@ -311,6 +311,7 @@ button.file-row { cursor: pointer; }
 .menu-check.is-on { background: var(--btn-dark-bg); border-color: transparent; }
 .menu-check.is-on::after { content: ''; width: 5px; height: 9px; margin-top: -2px; border: solid var(--btn-dark-text); border-width: 0 2px 2px 0; transform: rotate(45deg); }
 .menu-own { flex: 1; min-width: 0; }
+.menu-n { margin-right: 6px; }
 .menu-axis { display: flex; align-items: center; gap: 8px; padding: 0 4px; font-size: 13px; }
 .menu-foot { display: flex; align-items: center; gap: 12px; }
 .menu-foot .menu-hint { flex: 1; }

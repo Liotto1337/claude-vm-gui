@@ -66,3 +66,67 @@ describe('TerminalService.open', () => {
     expect(term.current).toBe('cur');
   });
 });
+
+describe('TerminalService: ввод сессии A не уходит в B после быстрого переключения', () => {
+  // Каждый open — свой канал; проверка «пишется ли» (exec) занимает время, за которое пользователь выбирает другую сессию
+  function twoSessions() {
+    const writes: string[] = [];
+    let opened = 0;
+    const conn = Object.assign(new EventEmitter(), {
+      connected: true,
+      openPty: async (cmd: string) => {
+        const name = /=([\w-]+)/.exec(cmd)?.[1] ?? `#${++opened}`;
+        return Object.assign(new EventEmitter(), {
+          stderr: new EventEmitter(),
+          write: (d: string) => void writes.push(`${name}:${d}`),
+          setWindow: () => {},
+          close: () => {},
+        });
+      },
+      exec: async () => {
+        await new Promise((r) => setTimeout(r, 40));
+        return { code: 0, stdout: 'claude\t1\n__cvg_sep__\nclaude\n__cvg_sep__\n', stderr: '' };
+      },
+    });
+    const term = new TerminalService(conn as unknown as SshConnection, {} as TmuxService);
+    return { term, writes };
+  }
+
+  it('клавиши карточки меню сессии a после open(b) — NO_SESSION, в b ничего', async () => {
+    const { term, writes } = twoSessions();
+    expect((await term.open('a', 80, 24)).ok).toBe(true);
+    const keys = Promise.all([term.key('down', 'a'), term.key('enter', 'a')]);
+    setTimeout(() => void term.open('b', 80, 24), 10);
+    const [k1, k2] = await keys;
+    expect(writes.filter((w) => w.startsWith('b:'))).toEqual([]);
+    expect([k1.ok, k2.ok]).toEqual([false, false]);
+  });
+
+  it('свой ответ сессии a после open(b) — в b не печатается', async () => {
+    const { term, writes } = twoSessions();
+    await term.open('a', 80, 24);
+    const typed = term.typeText('да', 'a');
+    setTimeout(() => void term.open('b', 80, 24), 10);
+    expect((await typed).ok).toBe(false);
+    expect(writes.filter((w) => w.startsWith('b:'))).toEqual([]);
+  });
+
+  it('отправка из сессии a, пока выбирают b — NO_SESSION, ни вставки, ни Enter в b', async () => {
+    const { term, writes } = twoSessions();
+    await term.open('a', 80, 24);
+    const sent = term.send('rm -rf build', [], 'a');
+    setTimeout(() => void term.open('b', 80, 24), 10);
+    expect(await sent).toMatchObject({ ok: false, error: { code: 'NO_SESSION' } });
+    expect(writes.filter((w) => w.startsWith('b:'))).toEqual([]);
+  });
+
+  it('клавиша для только что выбранной сессии b ждёт её подключения и уходит в b', async () => {
+    const { term, writes } = twoSessions();
+    await term.open('a', 80, 24);
+    const opening = term.open('b', 80, 24);
+    const k = await term.key('down', 'b');
+    await opening;
+    expect(k.ok).toBe(true);
+    expect(writes).toEqual(['b:\x1b[B']);
+  });
+});

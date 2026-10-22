@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { MenuOption, ParsedMenu, ScreenState } from '../../src/shared/ipc';
-import { answerOf, loadAnswers, nextAnswers, saveAnswers, type MenuAnswer } from '../../src/renderer/menu-history';
+import { answerOf, loadAnswers, nextAnswers, placeAnswers, saveAnswers, type MenuAnswer } from '../../src/renderer/menu-history';
 
 const opt = (label: string, extra: Partial<MenuOption> = {}): MenuOption => ({ n: null, label, description: '', selected: false, ...extra });
 const menu = (title: string, options: MenuOption[], kind: ParsedMenu['kind'] = 'single'): ScreenState => ({
@@ -49,5 +49,19 @@ describe('хранение', () => {
     globalThis.localStorage = { getItem: () => { throw new Error('нет'); }, setItem: () => { throw new Error('нет'); } } as unknown as Storage;
     expect(loadAnswers('h', 's')).toEqual([]);
     expect(() => saveAnswers('h', 's', list)).not.toThrow();
+  });
+});
+
+describe('placeAnswers', () => {
+  const a = (id: string, after: string | null): MenuAnswer => ({ id, after, text: id, at: 1 });
+  it('итог после своего элемента; без якоря (меню — первый экран сессии) — вверху', () => {
+    const r = placeAnswers(['u1', 'u2'], [a('x', 'u1'), a('y', null), a('z', 'u1')]);
+    expect(r.top.map((x) => x.id)).toEqual(['y']);
+    expect([...r.after.entries()].map(([k, v]) => [k, v.map((x) => x.id)])).toEqual([['u1', ['x', 'z']]]);
+  });
+  it('якорь не в загруженной части журнала (или сессию пересоздали с тем же именем) — итог не показывается, а не оседает внизу', () => {
+    const r = placeAnswers(['u9'], [a('old', 'u1')]);
+    expect(r.top).toEqual([]);
+    expect(r.after.size).toBe(0);
   });
 });

@@ -21,7 +21,7 @@ function OwnAnswer({ session, menu, index, multi }: { session: string; menu: Par
   const submit = async () => {
     if (!text.trim()) return;
     await sendKeys(session, moveKeysFor(menu, index));
-    const r = await api.chat.typeText(text);
+    const r = await api.chat.typeText(text, session);
     if (r.ok && !multi) await menuKey(session, 'enter');
     setText('');
   };
@@ -47,6 +47,7 @@ function OwnAnswer({ session, menu, index, multi }: { session: string; menu: Par
 function Label({ o }: { o: MenuOption }) {
   return (
     <span className="menu-label">
+      {o.n !== null ? <span className="caption menu-n">{o.n}.</span> : null}
       {o.label}
       {o.description ? <span className="caption"> {o.description}</span> : null}
     </span>

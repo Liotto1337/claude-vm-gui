@@ -176,52 +176,61 @@ export class TerminalService extends EventEmitter {
    * Клавиша из белого списка (карточка меню, «Остановить») — только если на переднем плане claude.
    * Клавиши идут строго по очереди: иначе Enter мог бы обогнать ↓ и выбрать вариант по умолчанию.
    */
-  key(k: MenuKey): Promise<Result<void>> {
-    const run = this.keyQueue.then(() => this.keyNow(k));
+  key(k: MenuKey, session?: string): Promise<Result<void>> {
+    const run = this.keyQueue.then(() => this.keyNow(k, session));
     this.keyQueue = run.catch(() => undefined);
     return run;
   }
 
-  /** Свой ответ в меню («Type something.»): текст буквально, без Enter; управляющие символы вырезаются. В той же очереди, что клавиши. */
-  typeText(text: string): Promise<Result<void>> {
-    const run = this.keyQueue.then(async () => {
+  /** Свой ответ в меню («Type something.»): текст буквально, без Enter; управляющие символы — пробелы. В той же очереди, что клавиши. */
+  typeText(text: string, session?: string): Promise<Result<void>> {
+    const run = this.keyQueue.then(async (): Promise<Result<void>> => {
       const clean = String(text).replace(/[\x00-\x1f\x7f]/g, ' ');
       if (!clean) return ok(undefined);
-      await this.opening;
-      if (!this.stream) return fail<void>('NO_SESSION', 'Сессия не открыта');
-      const check = await this.checkWritable(true);
-      if (!check.ok) return check;
-      this.stream?.write(clean);
+      const t = await this.target(session, true);
+      if (!t.ok) return t;
+      t.data.stream.write(clean);
       return ok(undefined);
     });
     this.keyQueue = run.catch(() => undefined);
     return run;
   }
 
-  private async keyNow(k: MenuKey): Promise<Result<void>> {
+  private async keyNow(k: MenuKey, session?: string): Promise<Result<void>> {
     let bytes: string;
     try {
       bytes = keyBytes(k);
     } catch (e) {
       return fail('BAD_NAME', (e as Error).message);
     }
-    await this.opening;
-    if (!this.stream) return fail('NO_SESSION', 'Сессия не открыта');
-    const check = await this.checkWritable(true);
-    if (!check.ok) return check;
-    this.stream?.write(bytes);
+    const t = await this.target(session, true);
+    if (!t.ok) return t;
+    t.data.stream.write(bytes);
     return ok(undefined);
   }
 
-  private async writeChecked(data: () => string): Promise<Result<void>> {
+  /**
+   * Куда писать: дождаться идущего подключения (ввод сразу после выбора сессии), проверить экран и убедиться,
+   * что за это время не выбрали другую сессию — ввод, начатый в сессии A, не должен уйти в B.
+   * expected — сессия, из которой пришёл ввод; без неё — текущая на момент вызова.
+   */
+  private async target(expected: string | undefined, allowMenu = false): Promise<Result<{ stream: ClientChannel; name: string }>> {
     await this.opening;
-    if (!this.stream) return fail('NO_SESSION', 'Сессия не открыта');
-    const check = await this.checkWritable();
+    const stream = this.stream;
+    const name = this.session;
+    if (!stream || !name || (expected !== undefined && name !== expected)) return fail('NO_SESSION', 'Сессия не открыта');
+    const check = await this.checkWritable(allowMenu);
     if (!check.ok) return check;
-    if (!this.stream) return fail('NO_SESSION', 'Сессия не открыта');
+    if (this.stream !== stream || this.session !== name) return fail('NO_SESSION', 'Сессия не открыта');
+    return ok({ stream, name });
+  }
+
+  private async writeChecked(data: () => string, session?: string): Promise<Result<{ stream: ClientChannel; name: string }>> {
+    const t = await this.target(session);
+    if (!t.ok) return t;
     try {
-      this.stream.write(data());
-      return ok(undefined);
+      t.data.stream.write(data());
+      return t;
     } catch (e) {
       return fail('BAD_NAME', (e as Error).message);
     }
@@ -262,12 +271,12 @@ export class TerminalService extends EventEmitter {
    * Поле не опустело — ровно один повтор Enter, потом ошибка. Снимков экрана нет — без повтора.
    * Поле пустое ещё до Enter — вставка не дошла: ошибка без Enter.
    */
-  async send(text: string, imagePaths: string[]): Promise<Result<void>> {
+  async send(text: string, imagePaths: string[], session?: string): Promise<Result<void>> {
     const data = bracketedPaste(text, imagePaths);
-    const r = await this.writeChecked(() => data.slice(0, -1));
-    // Сессия — после записи: отправка могла ждать подключения к только что выбранной сессии
-    const name = this.session;
-    if (!r.ok || !name) return r;
+    const r = await this.writeChecked(() => data.slice(0, -1), session);
+    if (!r.ok) return r;
+    // Сессия, в которую ушла вставка: Enter — только туда (если тем временем выбрали другую — NO_SESSION ниже)
+    const { name, stream } = r.data;
     const t = this.timings;
     const menuOpen = () => fail<void>('PROMPT_OPEN', PROMPT_OPEN_TEXT);
 
@@ -292,7 +301,8 @@ export class TerminalService extends EventEmitter {
       await sleep(t.fallbackMs);
       const screen = await this.probe(name);
       if (screen !== null && dialogOpen(screen)) return menuOpen();
-      this.stream?.write('\r');
+      if (this.stream !== stream || this.session !== name) return fail<void>('NO_SESSION', 'Сессия не открыта');
+      stream.write('\r');
       return ok(undefined);
     };
     let last = ready ?? prev;
@@ -309,8 +319,8 @@ export class TerminalService extends EventEmitter {
       if (last === '') return fail('SEND_NOT_CONFIRMED', PASTE_LOST_TEXT);
     }
     for (let attempt = 0; attempt < 2; attempt++) {
-      if (!this.stream || this.session !== name) return fail('NO_SESSION', 'Сессия не открыта');
-      this.stream.write('\r');
+      if (this.stream !== stream || this.session !== name) return fail('NO_SESSION', 'Сессия не открыта');
+      stream.write('\r');
       const verdict = await this.accepted(name, t.confirmMs);
       // Проверить нечем — Enter, скорее всего, сработал; повтор мог бы отправить сообщение дважды
       if (verdict !== 'no') return ok(undefined);
@@ -318,12 +328,14 @@ export class TerminalService extends EventEmitter {
     return fail('SEND_NOT_CONFIRMED', NOT_CONFIRMED_TEXT);
   }
 
-  async setModel(value: string): Promise<Result<void>> {
-    return this.writeChecked(() => slashCommand('model', value));
+  async setModel(value: string, session?: string): Promise<Result<void>> {
+    const r = await this.writeChecked(() => slashCommand('model', value), session);
+    return r.ok ? ok(undefined) : r;
   }
 
-  async setEffort(level: string): Promise<Result<void>> {
-    return this.writeChecked(() => slashCommand('effort', level));
+  async setEffort(level: string, session?: string): Promise<Result<void>> {
+    const r = await this.writeChecked(() => slashCommand('effort', level), session);
+    return r.ok ? ok(undefined) : r;
   }
 
   private detachStream(): void {

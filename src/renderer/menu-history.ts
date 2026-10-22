@@ -34,6 +34,22 @@ export function nextAnswers(
   return [...list, { id: `answer-${now}`, after: anchor, text: answerOf(prev.menu, lastKey), at: now }].slice(-MAX);
 }
 
+/**
+ * Где показать итоги: после своего элемента журнала; без якоря (меню — первый экран сессии) — вверху.
+ * Якорь не среди загруженных элементов (ранняя часть журнала, сессию пересоздали с тем же именем) — не показываем:
+ * иначе старые итоги оседали бы внизу ленты.
+ */
+export function placeAnswers(itemIds: string[], answers: MenuAnswer[]): { top: MenuAnswer[]; after: Map<string, MenuAnswer[]> } {
+  const ids = new Set(itemIds);
+  const top: MenuAnswer[] = [];
+  const after = new Map<string, MenuAnswer[]>();
+  for (const a of answers) {
+    if (a.after === null) top.push(a);
+    else if (ids.has(a.after)) after.set(a.after, [...(after.get(a.after) ?? []), a]);
+  }
+  return { top, after };
+}
+
 const key = (host: string, session: string) => `cvg:answers:${host}:${session}`;
 
 /** Итоги сессии из localStorage; хранилище недоступно или испорчено — пусто. */

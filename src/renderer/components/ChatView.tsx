@@ -4,7 +4,7 @@ import { api } from '../api';
 import { typingDone, useAppState } from '../state';
 import { ChatItemView } from './ChatItemView';
 import { MenuCard } from './MenuCard';
-import type { MenuAnswer } from '../menu-history';
+import { placeAnswers } from '../menu-history';
 import { IconFile, IconImage } from './icons';
 import { Spinner } from './Spinner';
 
@@ -19,16 +19,7 @@ export function ChatView({ session }: { session: string }) {
   const working = status !== null || (!!chat?.busy && chat.screen?.kind !== 'menu');
   const menu = chat?.screen?.kind === 'menu' ? chat.screen.menu : null;
   // Итоги ответов на меню — на месте карточки: после элемента, который был последним, когда меню открылось
-  const { answersAfter, answersLost } = useMemo(() => {
-    const ids = new Set(items.map((i) => i.id));
-    const after = new Map<string, MenuAnswer[]>();
-    const lost: MenuAnswer[] = [];
-    for (const a of chat?.answers ?? []) {
-      if (a.after !== null && ids.has(a.after)) after.set(a.after, [...(after.get(a.after) ?? []), a]);
-      else lost.push(a);
-    }
-    return { answersAfter: after, answersLost: lost };
-  }, [items, chat?.answers]);
+  const answers = useMemo(() => placeAnswers(items.map((i) => i.id), chat?.answers ?? []), [items, chat?.answers]);
   const pending = chat?.pending ?? [];
   const typing = chat?.typing ?? {};
   // Пока ответ «печатается», лента следит за низом
@@ -119,6 +110,8 @@ export function ChatView({ session }: { session: string }) {
           </button>
         ) : null}
         {items.length === 0 && pending.length === 0 && !working ? <p className="caption chat-empty">Переписка пока пустая</p> : null}
+        {/* Итоги без якоря — начало сессии: пока ранняя часть журнала не загружена, им тут не место */}
+        {chat?.hasEarlier ? null : answers.top.map((a) => <ChatItemView key={a.id} item={{ kind: 'note', id: a.id, text: a.text }} />)}
         {items.map((i) => (
           <Fragment key={i.id}>
             <ChatItemView
@@ -129,11 +122,9 @@ export function ChatView({ session }: { session: string }) {
                 setTick((t) => t + 1);
               } : undefined}
             />
-            {answersAfter.get(i.id)?.map((a) => <ChatItemView key={a.id} item={{ kind: 'note', id: a.id, text: a.text }} />)}
+            {answers.after.get(i.id)?.map((a) => <ChatItemView key={a.id} item={{ kind: 'note', id: a.id, text: a.text }} />)}
           </Fragment>
         ))}
-        {/* Якорь итога не в загруженной части журнала (или журнал был пуст) — в конце */}
-        {answersLost.map((a) => <ChatItemView key={a.id} item={{ kind: 'note', id: a.id, text: a.text }} />)}
         {pending.map((p) => (
           <div key={p.id} className={p.state === 'sending' ? 'bubble is-sending' : 'bubble'}>
             {p.files.map((f) => (

@@ -189,9 +189,10 @@ export interface Api {
     resize(cols: number, rows: number): void;
     onData(cb: (d: string) => void): Unsubscribe;
     onExit(cb: (reason: ExitReason) => void): Unsubscribe;
-    send(text: string, filePaths: string[]): Promise<Result<void>>;
-    setModel(value: string): Promise<Result<void>>;
-    setEffort(level: string): Promise<Result<void>>;
+    /** session — откуда отправили: если тем временем открыли другую сессию, ничего не пишется (NO_SESSION) */
+    send(text: string, filePaths: string[], session?: string): Promise<Result<void>>;
+    setModel(value: string, session?: string): Promise<Result<void>>;
+    setEffort(level: string, session?: string): Promise<Result<void>>;
   };
   hints: {
     get(cwd: string): Promise<Result<Hints>>;
@@ -218,9 +219,9 @@ export interface Api {
     onScreen(cb: (e: ScreenEvent) => void): Unsubscribe;
     onUnavailable(cb: (e: { session: string; reason: string }) => void): Unsubscribe;
     loadEarlier(): Promise<Result<void>>;
-    key(k: MenuKey): Promise<Result<void>>;
+    key(k: MenuKey, session?: string): Promise<Result<void>>;
     /** Текст в поле своего ответа меню (без Enter) */
-    typeText(text: string): Promise<Result<void>>;
+    typeText(text: string, session?: string): Promise<Result<void>>;
   };
   /** Новая версия на GitHub: get — последняя найденная (событие могло прийти раньше подписки) */
   updates: {

@@ -291,7 +291,15 @@ const lastMenuKey = new Map<string, MenuKey>();
 /** Клавиша карточки меню: запоминается последняя — Esc даёт итог «отменено». */
 export function menuKey(session: string, k: MenuKey): ReturnType<typeof api.chat.key> {
   lastMenuKey.set(session, k);
-  return api.chat.key(k);
+  return api.chat.key(k, session);
+}
+
+const TERMINAL_KEYS: Record<string, MenuKey> = { '\x1b': 'esc', '\x03': 'esc', '\r': 'enter', '\x1b[A': 'up', '\x1b[B': 'down', ' ': 'space' };
+
+/** Ввод прямо в терминале приложения (режим «Терминал»): Esc и Ctrl+C тоже дают итог меню «отменено». */
+export function noteTerminalInput(session: string, data: string): void {
+  const k = TERMINAL_KEYS[data] ?? (/^[1-9]$/.test(data) ? (data as MenuKey) : undefined);
+  if (k) lastMenuKey.set(session, k);
 }
 
 export function addPending(session: string, text: string, files: string[]): string {

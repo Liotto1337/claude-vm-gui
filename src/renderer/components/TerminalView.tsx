@@ -5,7 +5,7 @@ import '@xterm/xterm/css/xterm.css';
 import type { ExitReason } from '@shared/ipc';
 import { parseOsc52 } from '@shared/osc52';
 import { api } from '../api';
-import { refreshSessions, useAppState } from '../state';
+import { noteTerminalInput, refreshSessions, useAppState } from '../state';
 import { terminalTheme } from '../terminal-theme';
 
 const EXIT_TEXT: Record<Exclude<ExitReason, 'connection-lost'>, string> = {
@@ -91,7 +91,10 @@ export function TerminalView({ name, hidden = false }: { name: string; hidden?: 
       setExit(reason);
       void refreshSessions();
     });
-    const input = term.onData((d) => api.term.write(d));
+    const input = term.onData((d) => {
+      noteTerminalInput(name, d);
+      api.term.write(d);
+    });
     void api.term.open(name, term.cols, term.rows).then((r) => {
       if (!r.ok) setExit('killed');
       else if (!hiddenRef.current) term.focus();

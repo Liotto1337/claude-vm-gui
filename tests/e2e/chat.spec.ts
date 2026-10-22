@@ -95,6 +95,8 @@ test('меню: карточка, стрелка вниз и Enter выбира�
     await expect(page.locator('.menu-layer')).toHaveCount(0);
     expect(await card.evaluate((el) => !el.nextElementSibling || el.nextElementSibling.classList.contains('chat-status'))).toBe(true);
     await expect(card.getByRole('radiogroup').getByRole('radio', { name: /Да и не спрашивать/ })).toBeVisible();
+    // Номер варианта виден: подсказка обещает «цифра — сразу»
+    await expect(card.getByRole('radio', { name: /Да и не спрашивать/ }).locator('.menu-n')).toHaveText('2.');
     await expect(composer(page)).toBeDisabled();
     await page.keyboard.press('ArrowDown');
     await expect(card.getByRole('radio', { name: /Да и не спрашивать/ })).toHaveAttribute('aria-checked', 'true', { timeout: 5000 });
@@ -457,8 +459,8 @@ test('множественный выбор в ленте: чекбоксы и �
     await expect(card.getByRole('checkbox', { name: /Submit/ })).toHaveCount(0);
     await card.getByRole('checkbox', { name: /Да и не спрашивать/ }).click();
     await expect(card.getByRole('checkbox', { name: /Да и не спрашивать/ })).toHaveAttribute('aria-checked', 'true', { timeout: 5000 });
-    await card.getByRole('checkbox', { name: /^Нет/ }).click();
-    await expect(card.getByRole('checkbox', { name: /^Нет/ })).toHaveAttribute('aria-checked', 'true', { timeout: 5000 });
+    await card.getByRole('checkbox', { name: /Нет$/ }).click();
+    await expect(card.getByRole('checkbox', { name: /Нет$/ })).toHaveAttribute('aria-checked', 'true', { timeout: 5000 });
     await card.getByRole('button', { name: 'Готово' }).click();
     await expect(feed(page).getByText('выбраны: Да и не спрашивать, Нет')).toBeVisible({ timeout: 10_000 });
   } finally {

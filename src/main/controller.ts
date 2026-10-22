@@ -27,6 +27,9 @@ interface Services {
 }
 
 /** Подключение к ВМ и все сервисы, доступные интерфейсу через window.api. */
+/** Имя сессии из рендерера — только строка; иначе «текущая» */
+const optName = (v: unknown): string | undefined => (typeof v === 'string' ? v : undefined);
+
 export class AppController {
   private s: Services | null = null;
   private hostKeyAnswer: ((trust: boolean) => void) | null = null;
@@ -66,14 +69,14 @@ export class AppController {
     );
     h.listen('term:write', (data: string) => this.s?.term.write(data));
     h.listen('term:resize', (cols: number, rows: number) => this.s?.term.resize(cols, rows));
-    h.handle('term:send', (text: string, paths: string[]) => this.need((s) => s.term.send(text, paths)));
-    h.handle('term:setModel', (v: string) => this.need((s) => s.term.setModel(v)));
-    h.handle('term:setEffort', (v: string) => this.need((s) => s.term.setEffort(v)));
+    h.handle('term:send', (text: string, paths: string[], session?: string) => this.need((s) => s.term.send(text, paths, optName(session))));
+    h.handle('term:setModel', (v: string, session?: string) => this.need((s) => s.term.setModel(v, optName(session))));
+    h.handle('term:setEffort', (v: string, session?: string) => this.need((s) => s.term.setEffort(v, optName(session))));
 
     h.listen('metrics:setActive', (fast: boolean) => this.s?.metrics.setActive(fast === true));
     h.handle('metrics:info', () => this.need((s) => s.metrics.info()));
-    h.handle('chat:key', (k: MenuKey) => this.need((s) => s.term.key(k)));
-    h.handle('chat:typeText', (t: string) => this.need((s) => s.term.typeText(t)));
+    h.handle('chat:key', (k: MenuKey, session?: string) => this.need((s) => s.term.key(k, optName(session))));
+    h.handle('chat:typeText', (t: string, session?: string) => this.need((s) => s.term.typeText(t, optName(session))));
     h.handle('chat:loadEarlier', () => this.need((s) => s.transcript.loadEarlier()));
 
     h.handle('hints:get', (cwd: string) => this.need((s) => s.hints.get(cwd)));
