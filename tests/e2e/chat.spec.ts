@@ -465,3 +465,31 @@ test('множественный выбор в ленте: чекбоксы и �
     await app.close();
   }
 });
+
+test('итог ответа на меню остаётся в ленте на месте карточки, и после перезапуска', async () => {
+  let l = await open();
+  try {
+    await expect(feed(l.page)).toBeVisible({ timeout: 15_000 });
+    await composer(l.page).fill('menu');
+    await composer(l.page).press('Enter');
+    await feed(l.page).getByRole('group', { name: 'Выбор' }).getByRole('radio', { name: /Нет/ }).click({ timeout: 10_000 });
+    const note = feed(l.page).locator('.note', { hasText: 'Выбор → выбрано: Нет' });
+    await expect(note).toBeVisible({ timeout: 10_000 });
+    // После сообщения «menu» и до ответа Claude
+    const order = await feed(l.page).locator('.bubble, .note, .md').allTextContents();
+    const at = order.findIndex((t) => t.includes('Выбор → выбрано: Нет'));
+    expect(order[at - 1]).toContain('menu');
+    expect(order.slice(at + 1).join(' ')).toContain('выбран 3');
+  } finally {
+    await l.app.close();
+  }
+  l = await launchApp({
+    CVG_USER_DATA: l.userData, CVG_KNOWN_HOSTS: trustedKnownHosts(), CVG_TMUX_SOCKET: SOCK, CVG_CLAUDE_DIR: claudeDir, CVG_TEST_HOOKS: '1',
+  });
+  try {
+    await l.page.getByRole('navigation', { name: 'Сессии' }).getByRole('button', { name: /^cvg-test-claude\b/ }).click({ timeout: 20_000 });
+    await expect(feed(l.page).locator('.note', { hasText: 'Выбор → выбрано: Нет' })).toBeVisible({ timeout: 15_000 });
+  } finally {
+    await l.app.close();
+  }
+});

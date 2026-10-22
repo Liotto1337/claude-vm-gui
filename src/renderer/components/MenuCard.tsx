@@ -2,26 +2,27 @@ import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import type { MenuKey, MenuOption, ParsedMenu } from '@shared/ipc';
 import { menuKeysFor, moveKeysFor, submitKeysFor, toggleKeysFor } from '@shared/screen-parse';
 import { api } from '../api';
+import { menuKey } from '../state';
 
 const KEY_MAP: Record<string, MenuKey> = {
   ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right', Enter: 'enter', Escape: 'esc', ' ': 'space',
 };
 
-const send = async (keys: MenuKey[]) => {
+const sendKeys = async (session: string, keys: MenuKey[]) => {
   for (const k of keys) {
-    const r = await api.chat.key(k);
+    const r = await menuKey(session, k);
     if (!r.ok) break;
   }
 };
 
 /** Свой ответ («Type something.»): поле прямо в варианте; Enter — курсор на вариант, текст, Enter. */
-function OwnAnswer({ menu, index, multi }: { menu: ParsedMenu; index: number; multi: boolean }) {
+function OwnAnswer({ session, menu, index, multi }: { session: string; menu: ParsedMenu; index: number; multi: boolean }) {
   const [text, setText] = useState('');
   const submit = async () => {
     if (!text.trim()) return;
-    await send(moveKeysFor(menu, index));
+    await sendKeys(session, moveKeysFor(menu, index));
     const r = await api.chat.typeText(text);
-    if (r.ok && !multi) await api.chat.key('enter');
+    if (r.ok && !multi) await menuKey(session, 'enter');
     setText('');
   };
   return (
@@ -56,7 +57,7 @@ function Label({ o }: { o: MenuOption }) {
  * Меню Claude Code (разрешение, вопрос, выбор) последним элементом ленты: один выбор — радиокнопки,
  * несколько — чекбоксы и «Готово»; клавиши уходят в claude как есть.
  */
-export function MenuCard({ menu }: { menu: ParsedMenu }) {
+export function MenuCard({ session, menu }: { session: string; menu: ParsedMenu }) {
   const card = useRef<HTMLDivElement>(null);
   const title = menu.title || 'Claude Code спрашивает';
   const multi = menu.kind === 'multi';
@@ -73,7 +74,7 @@ export function MenuCard({ menu }: { menu: ParsedMenu }) {
     e.preventDefault();
     // Стрелки не листают ленту и не выключают слежение за низом
     e.stopPropagation();
-    void api.chat.key(k);
+    void menuKey(session, k);
   };
 
   const shown = menu.options.map((o, i) => [o, i] as const).filter(([o]) => !o.submit);
@@ -97,20 +98,20 @@ export function MenuCard({ menu }: { menu: ParsedMenu }) {
               role={box ? 'checkbox' : 'radio'}
               aria-checked={box ? !!o.checked : o.selected}
               className={o.selected ? 'menu-option is-cursor' : 'menu-option'}
-              onClick={() => void send(box ? toggleKeysFor(menu, i) : menuKeysFor(menu, i))}
+              onClick={() => void sendKeys(session, box ? toggleKeysFor(menu, i) : menuKeysFor(menu, i))}
             >
               <span className={box ? `menu-check${o.checked ? ' is-on' : ''}` : `menu-radio${o.selected ? ' is-on' : ''}`} aria-hidden="true" />
               <Label o={o} />
-              {o.input ? <OwnAnswer menu={menu} index={i} multi={multi} /> : null}
+              {o.input ? <OwnAnswer session={session} menu={menu} index={i} multi={multi} /> : null}
             </div>
           );
         })}
       </div>
       {menu.axis ? (
         <div className="menu-axis">
-          <button type="button" className="icon-btn" aria-label="Меньше" onClick={() => void api.chat.key('left')}>◀</button>
+          <button type="button" className="icon-btn" aria-label="Меньше" onClick={() => void menuKey(session, 'left')}>◀</button>
           <span>{menu.axis.value}</span>
-          <button type="button" className="icon-btn" aria-label="Больше" onClick={() => void api.chat.key('right')}>▶</button>
+          <button type="button" className="icon-btn" aria-label="Больше" onClick={() => void menuKey(session, 'right')}>▶</button>
         </div>
       ) : null}
       {menu.notes.length ? <div className="caption menu-notes">{menu.notes.join(' · ')}</div> : null}
@@ -119,7 +120,7 @@ export function MenuCard({ menu }: { menu: ParsedMenu }) {
           ↑↓ — выбор · {multi ? 'Пробел — отметить' : 'Enter — ответить'} · Esc — отмена{!multi && menu.options.some((o) => o.n) ? ' · цифра — сразу' : ''}
         </div>
         {multi && menu.options.some((o) => o.submit) ? (
-          <button type="button" className="btn btn-sm btn-dark" onClick={() => void send(submitKeysFor(menu))}>Готово</button>
+          <button type="button" className="btn btn-sm btn-dark" onClick={() => void sendKeys(session, submitKeysFor(menu))}>Готово</button>
         ) : null}
       </div>
     </div>

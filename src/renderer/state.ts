@@ -1,9 +1,9 @@
 import { useSyncExternalStore } from 'react';
 import type {
-  ChatItem, ConnectionState, ErrorCode, Hints, HostKeyPrompt, MetricsSample, PreflightEvent, PreflightStep, ScreenState,
-  SidebarLayout, SystemInfo, TmuxSession, VmConfig,
+  ChatItem, ConnectionState, ErrorCode, Hints, HostKeyPrompt, MenuKey, MetricsSample, PreflightEvent, PreflightStep, ScreenState, SidebarLayout, SystemInfo, TmuxSession, VmConfig,
 } from '@shared/ipc';
 import { claimPending, nextTyping, type Pending } from './chat-anim';
+import { loadAnswers, nextAnswers, saveAnswers, type MenuAnswer } from './menu-history';
 import { mergeItems } from './view-mode';
 import { addNewToGroup, EMPTY, reconcile } from '@shared/layout';
 import { api } from './api';
@@ -47,8 +47,11 @@ export interface ChatState {
   screen: ScreenState | null;
   busy: boolean;
   unavailable: string | null;
+  /** Итоги ответов на меню (на месте карточки) и якорь открытого меню — последний элемент журнала перед ним */
+  answers: MenuAnswer[];
+  menuAnchor: string | null;
 }
-const EMPTY_CHAT: ChatState = { items: [], pending: [], typing: {}, hasEarlier: false, screen: null, busy: false, unavailable: null };
+const EMPTY_CHAT: ChatState = { items: [], pending: [], typing: {}, hasEarlier: false, screen: null, busy: false, unavailable: null, answers: [], menuAnchor: null };
 
 let state: AppState = {
   view: 'loading',
@@ -76,7 +79,7 @@ const METRICS_WINDOW_MS = 5 * 60_000;
 
 function patchChat(session: string | null | undefined, patch: (c: ChatState) => Partial<ChatState>): void {
   if (!session) return;
-  const prev = state.chat[session] ?? EMPTY_CHAT;
+  const prev = state.chat[session] ?? { ...EMPTY_CHAT, answers: loadAnswers(state.config?.host ?? '', session) };
   setState({ chat: { ...state.chat, [session]: { ...prev, ...patch(prev) } } });
 }
 
@@ -181,7 +184,17 @@ export async function init(): Promise<void> {
         if (next.length !== c.pending.length || c.busy) patchChat(session, () => ({ pending: next }));
       }
   }, 5000);
-  api.chat.onScreen((e) => patchChat(e.session, () => ({ screen: e.state, busy: e.busy })));
+  api.chat.onScreen((e) =>
+    patchChat(e.session, (c) => {
+      const anchor = c.screen?.kind === 'menu' ? c.menuAnchor : (c.items.at(-1)?.id ?? null);
+      const answers = nextAnswers(c.screen, e.state, anchor, lastMenuKey.get(e.session) ?? null, c.answers, Date.now());
+      if (answers !== c.answers) {
+        saveAnswers(state.config?.host ?? '', e.session, answers);
+        lastMenuKey.delete(e.session);
+      }
+      return { screen: e.state, busy: e.busy, answers, menuAnchor: e.state.kind === 'menu' ? anchor : null };
+    }),
+  );
   api.chat.onUnavailable((e) => patchChat(e.session, () => ({ unavailable: e.reason })));
   api.metrics.onSample((s) => {
     if (s.error) return setState({ metricsErrorAt: state.metricsErrorAt ?? s.t });
@@ -273,6 +286,14 @@ export function setServerOpen(open: boolean): void {
 let pendingSeq = 0;
 
 /** Сообщение показано в ленте сразу, до отправки (темнее обычного). */
+const lastMenuKey = new Map<string, MenuKey>();
+
+/** Клавиша карточки меню: запоминается последняя — Esc даёт итог «отменено». */
+export function menuKey(session: string, k: MenuKey): ReturnType<typeof api.chat.key> {
+  lastMenuKey.set(session, k);
+  return api.chat.key(k);
+}
+
 export function addPending(session: string, text: string, files: string[]): string {
   const id = `pending-${++pendingSeq}`;
   patchChat(session, (c) => ({
