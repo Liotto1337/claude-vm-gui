@@ -152,7 +152,7 @@ function special(id: string, text: string): ChatItem | null | 'skip' {
     return all ? { kind: 'note', id, text: clipResult(all) } : 'skip';
   }
   if (/^\[Request interrupted by user/.test(text.trim())) return { kind: 'note', id, text: 'Остановлено пользователем' };
-  if (/^<(local-command-caveat|system-reminder)>/.test(text.trim())) return 'skip';
+  if (/^<(local-command-caveat|system-reminder|task-notification)>/.test(text.trim())) return 'skip';
   return null;
 }
 
@@ -261,6 +261,8 @@ function parseLines(lines: string[], st: ParseState): { changed: ChatItem[]; bad
     if (rec.isMeta === true) continue;
     // Сводка сжатия контекста («This session is being continued…») и прочее только для журнала — не реплики
     if (rec.isCompactSummary === true || rec.isVisibleInTranscriptOnly === true) continue;
+    // Уведомления фоновых задач Claude Code (<task-notification>) — служебные, не реплики
+    if ((rec.origin as { kind?: unknown } | undefined)?.kind === 'task-notification') continue;
     const msg = rec.message as { content?: unknown } | undefined;
     const content = msg?.content;
 

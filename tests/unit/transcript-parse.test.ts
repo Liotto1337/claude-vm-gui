@@ -129,6 +129,16 @@ describe('сводка сжатия и pasted_content', () => {
   });
 });
 
+describe('служебные уведомления фоновых задач', () => {
+  const parse = (lines: string[]) => parseTranscriptLines(lines, newParseState());
+  it('<task-notification> в ленту не попадает (и по origin, и по тексту)', () => {
+    const text = '<task-notification>\n<task-id>b1</task-id>\n<summary>Monitor event</summary>\n</task-notification>';
+    const byOrigin = JSON.stringify({ type: 'user', uuid: 'n1', origin: { kind: 'task-notification', producer: 'session-task' }, message: { role: 'user', content: text } });
+    const byText = JSON.stringify({ type: 'user', uuid: 'n2', message: { role: 'user', content: [{ type: 'text', text }] } });
+    expect(parse([byOrigin, byText]).changed).toEqual([]);
+  });
+});
+
 describe('субагенты и подгрузка ранней части', () => {
   const j = (o: object) => JSON.stringify(o);
   const task = (uuid: string, id: string, prompt: string) =>
