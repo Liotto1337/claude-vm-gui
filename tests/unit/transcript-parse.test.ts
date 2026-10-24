@@ -183,3 +183,63 @@ describe('субагенты и подгрузка ранней части', () 
     expect([...st.items.values()].map((i) => (i.kind === 'user' ? i.text : ''))).toEqual(['позже', 'раньше']);
   });
 });
+
+describe('контекст сессии', () => {
+  const CONTEXT_OUT = readFileSync(join(__dirname, '../fixtures/context-2.1.310.txt'), 'utf8');
+  const answer = (uuid: string, used: { r: number; w?: number }, model = 'claude-sonnet-5-5') =>
+    JSON.stringify({
+      type: 'assistant', uuid, timestamp: '2026-10-24T12:00:00.000Z',
+      message: { model, content: [{ type: 'text', text: `ответ ${uuid}` }], usage: { input_tokens: 10, cache_read_input_tokens: used.r, cache_creation_input_tokens: used.w ?? 0, output_tokens: 3 } },
+    });
+  const contextCmd = JSON.stringify({ type: 'user', uuid: 'c1', message: { content: '<command-name>/context</command-name>\n<command-message>context</command-message>\n<command-args></command-args>' } });
+  const contextOut = (uuid = 'c2', at = '2026-10-24T12:32:00.000Z') =>
+    JSON.stringify({ type: 'system', subtype: 'local_command', uuid, timestamp: at, content: `<local-command-stdout>${CONTEXT_OUT}</local-command-stdout>` });
+
+  it('«занято» и модель — по последнему ответу', () => {
+    const st = newParseState();
+    parseTranscriptLines([answer('a1', { r: 990 })], st);
+    expect(st.context).toMatchObject({ used: 1000, model: 'claude-sonnet-5-5' });
+    parseTranscriptLines([answer('a2', { r: 1990 })], st);
+    expect(st.context.used).toBe(2000);
+  });
+
+  it('/context и его вывод — не в ленте, замер в состоянии', () => {
+    const st = newParseState();
+    parseTranscriptLines([answer('a1', { r: 990 })], st);
+    const r = parseTranscriptLines([contextCmd, contextOut()], st);
+    expect(r.changed).toEqual([]);
+    expect(st.items.has('c1') || st.items.has('c2')).toBe(false);
+    expect(st.context.snapshot?.window).toBe(1_000_000);
+    expect(st.context.snapshotAt).toBe(Date.parse('2026-10-24T12:32:00.000Z'));
+    expect(st.context.snapshotModel).toBe('claude-sonnet-5-5');
+  });
+
+  it('вывод /context без своей команды рядом тоже распознаётся и скрывается', () => {
+    const st = newParseState();
+    const r = parseTranscriptLines([answer('a1', { r: 990 }), contextOut('c9')], st);
+    expect(r.changed.map((i) => i.id)).toEqual(['a1:0']);
+    expect(st.context.snapshot).not.toBeNull();
+  });
+
+  it('сводка сжатия сбрасывает «занято», замер остаётся', () => {
+    const st = newParseState();
+    parseTranscriptLines([answer('a1', { r: 990 }), contextOut()], st);
+    parseTranscriptLines([JSON.stringify({ type: 'user', uuid: 's1', isCompactSummary: true, message: { content: 'This session is being continued…' } })], st);
+    expect(st.context.used).toBeNull();
+    expect(st.context.snapshot).not.toBeNull();
+  });
+
+  it('ранняя часть журнала не подменяет свежие цифры', () => {
+    const st = newParseState();
+    parseTranscriptLines([answer('a5', { r: 4990 })], st);
+    const before = { ...st.context };
+    parseTranscriptLines([answer('a0', { r: 90 }, 'claude-opus-5-5'), contextOut('c0', '2026-10-01T00:00:00.000Z')], st, true);
+    expect(st.context).toEqual(before);
+  });
+
+  it('/compact — обычная строка пользователя', () => {
+    const st = newParseState();
+    const r = parseTranscriptLines([JSON.stringify({ type: 'user', uuid: 'k1', message: { content: '<command-name>/compact</command-name>\n<command-args>сохрани план</command-args>' } })], st);
+    expect(r.changed).toMatchObject([{ kind: 'user', text: '/compact сохрани план' }]);
+  });
+});

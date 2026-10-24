@@ -1,5 +1,6 @@
 import { UPLOAD_DIR_MARK } from './upload-name';
-import type { ChatImage, ChatItem } from './ipc';
+import type { ChatImage, ChatItem, SessionContext } from './ipc';
+import { parseContextOutput, usedFromAssistant } from './context-parse';
 import { stripAnsi } from './screen-parse';
 
 // Разбор журнала Claude Code (~/.claude/projects/…/<sessionId>.jsonl) в элементы ленты.
@@ -32,10 +33,13 @@ export interface ParseState {
   sideOwner: Map<string, string>;
   /** Битых строк подряд */
   badStreak: number;
+  /** Контекст сессии (только по живой части журнала) */
+  context: SessionContext;
 }
 
 export const newParseState = (): ParseState => ({
   items: new Map(), toolOwner: new Map(), orphanResults: new Map(), activeTask: null, taskPrompts: new Map(), sideOwner: new Map(), badStreak: 0,
+  context: { used: null, model: null, snapshot: null, snapshotAt: null, snapshotModel: null },
 });
 
 const MAX_RESULT_LINES = 200;
@@ -138,6 +142,8 @@ const tag = (s: string, name: string) => new RegExp(`<${name}>([\\s\\S]*?)</${na
 function special(id: string, text: string): ChatItem | null | 'skip' {
   const cmd = tag(text, 'command-name');
   if (cmd !== null) {
+    // /context — данные идут в панель «Контекст», не в ленту
+    if (cmd.trim() === '/context') return 'skip';
     const args = (tag(text, 'command-args') ?? '').trim();
     return { kind: 'user', id, text: `${cmd.trim()}${args ? ` ${args}` : ''}`, images: [], files: [] };
   }
@@ -163,11 +169,15 @@ function special(id: string, text: string): ChatItem | null | 'skip' {
  */
 export function parseTranscriptLines(lines: string[], st: ParseState, earlier = false): { changed: ChatItem[]; bad: number } {
   const live = st.activeTask;
+  const context = st.context;
   if (earlier) st.activeTask = null;
   try {
     return parseLines(lines, st);
   } finally {
-    if (earlier) st.activeTask = live;
+    if (earlier) {
+      st.activeTask = live;
+      st.context = context;
+    }
   }
 }
 
@@ -253,6 +263,13 @@ function parseLines(lines: string[], st: ParseState): { changed: ChatItem[]; bad
     const sidechain = rec.isSidechain === true;
 
     if (rec.type === 'system' && rec.subtype === 'local_command' && typeof rec.content === 'string') {
+      // вывод /context (даже без своей команды рядом) — замер для панели, не в ленту
+      if (rec.content.includes('Context Usage')) {
+        const snapshot = parseContextOutput(rec.content.replace(/<\/?local-command-stdout>/g, ''));
+        const at = typeof rec.timestamp === 'string' ? Date.parse(rec.timestamp) : NaN;
+        if (snapshot) st.context = { ...st.context, snapshot, snapshotAt: Number.isFinite(at) ? at : Date.now(), snapshotModel: st.context.model };
+        continue;
+      }
       const sp = special(id, rec.content);
       if (sp && sp !== 'skip') put(sp);
       continue;
@@ -260,7 +277,11 @@ function parseLines(lines: string[], st: ParseState): { changed: ChatItem[]; bad
     if (rec.type !== 'user' && rec.type !== 'assistant') continue;
     if (rec.isMeta === true) continue;
     // Сводка сжатия контекста («This session is being continued…») и прочее только для журнала — не реплики
-    if (rec.isCompactSummary === true || rec.isVisibleInTranscriptOnly === true) continue;
+    if (rec.isCompactSummary === true || rec.isVisibleInTranscriptOnly === true) {
+      // после сжатия сколько занято — неизвестно до следующего ответа
+      if (rec.isCompactSummary === true) st.context = { ...st.context, used: null };
+      continue;
+    }
     // Уведомления фоновых задач Claude Code (<task-notification>) — служебные, не реплики
     if ((rec.origin as { kind?: unknown } | undefined)?.kind === 'task-notification') continue;
     const msg = rec.message as { content?: unknown } | undefined;
@@ -308,6 +329,8 @@ function parseLines(lines: string[], st: ParseState): { changed: ChatItem[]; bad
     }
 
     // assistant
+    const used = usedFromAssistant(rec);
+    if (used) st.context = { ...st.context, ...used };
     if (!Array.isArray(content)) continue;
     const owner = sidechain ? ownerOf(rec) : undefined;
     (content as Block[]).forEach((b, i) => {
