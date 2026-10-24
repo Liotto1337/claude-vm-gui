@@ -5,7 +5,7 @@ tags: [проект, claude-vm-gui, electron]
 
 # Claude VM GUI
 
-Windows-приложение для работы с Claude Code, который запущен на ВМ (Ubuntu) в tmux. Заменяет ручной сценарий «cmd → ssh → tmux attach/new → claude → tmux kill-session» кнопками и показывает переписку в интерфейсе в стиле claude.ai (версия 0.3).
+Windows-приложение для работы с Claude Code, который запущен на ВМ (Ubuntu) в tmux. Заменяет ручной сценарий «cmd → ssh → tmux attach/new → claude → tmux kill-session» кнопками и показывает переписку в интерфейсе в стиле claude.ai (версия 0.4).
 
 ## Как пользоваться
 
