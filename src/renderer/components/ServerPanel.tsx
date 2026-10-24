@@ -3,20 +3,11 @@ import { formatBytes, formatRate, formatUptime } from '@shared/metrics-parse';
 import { plural } from '@shared/plural';
 import { setServerOpen, useAppState } from '../state';
 import { IconClose } from './icons';
+import { Bar, level, pct } from './Bar';
 import { Sparkline } from './Sparkline';
 
-const pct = (used: number, total: number) => (total > 0 ? Math.round((used / total) * 100) : 0);
-const level = (p: number) => (p >= 90 ? 'bar-danger' : p >= 80 ? 'bar-warn' : '');
 const num = (n: number) => n.toLocaleString('ru-RU', { maximumFractionDigits: 2 });
 
-function Bar({ label, used, total, thin = false }: { label: string; used: number; total: number; thin?: boolean }) {
-  const p = pct(used, total);
-  return (
-    <div role="progressbar" aria-label={label} aria-valuenow={p} aria-valuemin={0} aria-valuemax={100} className={`bar${thin ? ' bar-thin' : ''} ${level(p)}`}>
-      <div className="bar-fill" style={{ width: `${p}%` }} />
-    </div>
-  );
-}
 
 /** Панель «Сервер» справа: CPU, память, диски, сеть, процессы, сведения о системе. */
 export function ServerPanel() {

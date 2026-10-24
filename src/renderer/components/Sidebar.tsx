@@ -2,6 +2,7 @@ import { displayHost, openSettings, setServerOpen, useAppState } from '../state'
 import { IconGear, IconPlus, IconPulse } from './icons';
 import { Logo } from './Logo';
 import { SessionList } from './SessionList';
+import { UsageBox } from './UsageBox';
 
 export function Sidebar({ onNewSession }: { onNewSession: (group?: string) => void }) {
   const { config, connection, serverOpen } = useAppState();
@@ -23,6 +24,7 @@ export function Sidebar({ onNewSession }: { onNewSession: (group?: string) => vo
       </button>
       <SessionList onNewSession={onNewSession} />
       <div className="sidebar-foot">
+        <UsageBox />
         <button type="button" className="btn-ghost server-btn" aria-pressed={serverOpen} onClick={() => setServerOpen(!serverOpen)}>
           <IconPulse />
           Сервер

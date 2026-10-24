@@ -5,6 +5,7 @@ import { transcriptPath } from '@shared/claude-session';
 import { plural } from '@shared/plural';
 import { HintsService } from './hints';
 import { MetricsService } from './metrics';
+import { UsagePoller } from '@shared/usage-poller';
 import { SessionWatcher } from './session-watch';
 import { TranscriptService } from './transcript';
 import type { IpcHub } from './ipc';
@@ -22,13 +23,15 @@ interface Services {
   watch: SessionWatcher;
   transcript: TranscriptService;
   metrics: MetricsService;
+  usage: UsagePoller;
   claudeDir: string;
   stopPolling: () => void;
 }
 
-/** Подключение к ВМ и все сервисы, доступные интерфейсу через window.api. */
 /** Имя сессии из рендерера — только строка; иначе «текущая» */
 const optName = (v: unknown): string | undefined => (typeof v === 'string' ? v : undefined);
+
+/** Подключение к ВМ и все сервисы, доступные интерфейсу через window.api. */
 
 export class AppController {
   private s: Services | null = null;
@@ -74,6 +77,7 @@ export class AppController {
     h.handle('term:setEffort', (v: string, session?: string) => this.need((s) => s.term.setEffort(v, optName(session))));
 
     h.listen('metrics:setActive', (fast: boolean) => this.s?.metrics.setActive(fast === true));
+    h.handle('usage:get', () => this.s?.usage.latest ?? null);
     h.handle('metrics:info', () => this.need((s) => s.metrics.info()));
     h.handle('chat:key', (k: MenuKey, session?: string) => this.need((s) => s.term.key(k, optName(session))));
     h.handle('chat:typeText', (t: string, session?: string) => this.need((s) => s.term.typeText(t, optName(session))));
@@ -202,18 +206,22 @@ export class AppController {
     upload.on('progress', (p) => this.hub.emit('upload:progress', p));
     const hints = new HintsService(conn);
     const stopPolling = tmux.startPolling((sessions) => this.hub.emit('tmux:sessions', sessions));
-    this.s = { conn, tmux, term, hints, upload, watch, transcript, metrics, claudeDir, stopPolling };
+    // Лимиты подписки и токены за сегодня — раз в 2 минуты
+    const usage = new UsagePoller((cmd, o) => conn.exec(cmd, o), claudeDir);
+    usage.on('sample', (u) => this.hub.emit('usage:sample', u));
+    this.s = { conn, tmux, term, hints, upload, watch, transcript, metrics, usage, claudeDir, stopPolling };
     metrics.start();
+    usage.start();
     void upload.cleanup();
     return ok(undefined);
   }
 
-  /** Только для E2E (CVG_TEST_HOOKS=1): обрыв SSH, как при потере сети. */
   /** Окно приложения снова в фокусе — окно tmux под размер этого экрана (см. TerminalService.activate) */
   activate(): void {
     this.s?.term.activate();
   }
 
+  /** Только для E2E (CVG_TEST_HOOKS=1): обрыв SSH, как при потере сети. */
   simulateDrop(): void {
     (this.s?.conn as unknown as { client?: { end(): void } } | undefined)?.client?.end();
   }
@@ -226,6 +234,7 @@ export class AppController {
     if (!s) return;
     s.stopPolling();
     s.metrics.stop();
+    s.usage.stop();
     this.stopChat(s);
     s.term.close();
     s.conn.close();

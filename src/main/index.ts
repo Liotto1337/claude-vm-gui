@@ -64,7 +64,11 @@ app.whenReady().then(() => {
   });
   if (process.env.CVG_TEST_HOOKS === '1') {
     const g = globalThis as unknown as { __cvg?: object };
-    g.__cvg = Object.assign(g.__cvg ?? {}, { dropConnection: () => controller.simulateDrop() });
+    g.__cvg = Object.assign(g.__cvg ?? {}, {
+      dropConnection: () => controller.simulateDrop(),
+      // Лимиты подписки в E2E не запросить (нужен настоящий токен) — замер подставляется
+      emitUsage: (u: unknown) => hub.emit('usage:sample', u),
+    });
     // E2E на Linux без хранилища ключей: шифрование «для вида», чтобы проверить сохранение пароля
     if (process.platform === 'linux') safeStorage.setUsePlainTextEncryption(true);
   }

@@ -105,6 +105,15 @@ export interface MetricsSample {
 }
 export interface SystemInfo { os: string; kernel: string; cores: number; claudeVersion: string | null }
 
+/** Окно лимита подписки Claude: заполнено на pct %, сброс в resetsAt (ISO). */
+export interface UsageWindow { pct: number; resetsAt: string | null }
+/** Расход Claude: лимиты 5 ч и недели (null — нет подписки или сервис недоступен) и токены за сегодня по журналам. */
+export interface UsageSample {
+  t: number;
+  limits: { fiveHour: UsageWindow | null; week: UsageWindow | null } | null;
+  tokens: { input: number; output: number; cacheWrite: number; cacheRead: number } | null;
+  error: string | null;
+}
 /** Картинка сообщения из журнала (блок image): base64; без данных — пустые строки. */
 export interface ChatImage { mediaType: string; data: string }
 /** Элемент ленты переписки (из журнала Claude Code). files — пути вложений из папки загрузок на ВМ. */
@@ -223,6 +232,8 @@ export interface Api {
     /** Текст в поле своего ответа меню (без Enter) */
     typeText(text: string, session?: string): Promise<Result<void>>;
   };
+  /** Расход Claude: лимиты подписки и токены за сегодня; get — последний замер */
+  usage: { get(): Promise<UsageSample | null>; onSample(cb: (s: UsageSample) => void): Unsubscribe };
   /** Новая версия на GitHub: get — последняя найденная (событие могло прийти раньше подписки) */
   updates: {
     get(): Promise<UpdateInfo | null>;

@@ -1,0 +1,55 @@
+import { describe, expect, it } from 'vitest';
+import { formatReset, formatTokens, parseUsage, usageCommand } from '../../src/shared/usage';
+
+const LIMITS = JSON.stringify({
+  five_hour: { utilization: 28.0, resets_at: '2026-10-24T16:29:59.543239+00:00' },
+  seven_day: { utilization: 51.4, resets_at: '2026-10-29T03:59:59.543261+00:00' },
+  seven_day_opus: null,
+});
+
+describe('parseUsage', () => {
+  it('лимиты 5 ч и недели, токены за сегодня', () => {
+    const out = `__cvg_limits__\n${LIMITS}\n__cvg_tokens__\n1200 3400 50000 2000000\n`;
+    expect(parseUsage(out, 7)).toEqual({
+      t: 7,
+      limits: {
+        fiveHour: { pct: 28, resetsAt: '2026-10-24T16:29:59.543239+00:00' },
+        week: { pct: 51, resetsAt: '2026-10-29T03:59:59.543261+00:00' },
+      },
+      tokens: { input: 1200, output: 3400, cacheWrite: 50000, cacheRead: 2000000 },
+      error: null,
+    });
+  });
+  it('без подписки (нет токена, ошибка сервиса) — только токены', () => {
+    expect(parseUsage('__cvg_limits__\n\n__cvg_tokens__\n0 0 0 0\n', 1).limits).toBeNull();
+    expect(parseUsage('__cvg_limits__\n{"type":"error","error":{"message":"x"}}\n__cvg_tokens__\n1 2 3 4\n', 1)).toMatchObject({
+      limits: null, tokens: { input: 1, output: 2, cacheWrite: 3, cacheRead: 4 },
+    });
+  });
+  it('мусор — ошибка, а не исключение', () => expect(parseUsage('что-то', 1)).toMatchObject({ limits: null, tokens: null, error: 'нет данных' }));
+});
+
+describe('форматирование', () => {
+  it('токены: тысячи и миллионы', () => {
+    expect(formatTokens(850)).toBe('850');
+    expect(formatTokens(12_345)).toBe('12,3 тыс.');
+    expect(formatTokens(2_053_400)).toBe('2,1 млн');
+    expect(formatTokens(1_000_000_000)).toBe('1 млрд');
+  });
+  it('сброс: сегодня — время, другой день — день недели и время', () => {
+    const now = new Date(2026, 9, 24, 12, 0).getTime();
+    expect(formatReset(new Date(2026, 9, 24, 19, 29).toISOString(), now)).toBe('в 19:29');
+    expect(formatReset(new Date(2026, 9, 26, 6, 59).toISOString(), now)).toBe('пн 06:59');
+    expect(formatReset(null, now)).toBe('');
+  });
+});
+
+describe('usageCommand', () => {
+  const cmd = usageCommand('/home/u/.claude');
+  it('токен подписки не попадает в аргументы процессов (curl читает заголовок из stdin)', () => {
+    expect(cmd).toContain('curl -s -m 10 -K -');
+    expect(cmd).toContain('api.anthropic.com/api/oauth/usage');
+    expect(cmd).not.toMatch(/-H\s+["']?Authorization/);
+  });
+  it('каталог — в кавычках', () => expect(usageCommand("/tmp/a b'c")).toContain(`'/tmp/a b'\\''c'`));
+});

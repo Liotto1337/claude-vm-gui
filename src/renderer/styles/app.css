@@ -354,6 +354,9 @@ button.file-row { cursor: pointer; }
 .text-warn { color: var(--warn); }
 .swap-label { width: 40px; flex: none; }
 .disk { display: flex; flex-direction: column; gap: 4px; }
+.usage { display: flex; flex-direction: column; gap: 8px; padding: 8px 10px 10px; margin-bottom: 4px; border-top: 0.5px solid var(--border); font-size: 13px; }
+.usage-row { display: flex; flex-direction: column; gap: 4px; }
+.usage-head { display: flex; justify-content: space-between; gap: 8px; }
 .procs { width: 100%; border-collapse: collapse; font-size: 12px; }
 .procs th, .procs td { padding: 4px 8px; border: 0.5px solid var(--border); }
 .procs th { text-align: left; font-weight: 400; color: var(--text-2); }

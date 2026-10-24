@@ -62,6 +62,7 @@ const api: Api = {
     key: invoke('chat:key'),
     typeText: invoke('chat:typeText'),
   } as Api['chat'],
+  usage: { get: invoke('usage:get'), onSample: on('usage:sample') } as Api['usage'],
   updates: {
     get: invoke('updates:get'),
     onAvailable: on('updates:available'),
