@@ -8,6 +8,7 @@ import { revoke, type Attachment } from '../attachments';
 import { getDraft, restoreFailed, setDraft, updateDraft, useDraft } from '../drafts';
 import { AttachmentChip } from './AttachmentChip';
 import { ChoiceMenu } from './ChoiceMenu';
+import { EffortSlider } from './EffortSlider';
 import { HintPopup, type HintItem } from './HintPopup';
 import { IconArrowUp, IconClip } from './icons';
 
@@ -288,16 +289,13 @@ export function Composer({ session, menu = null, working = false, chatMode = fal
                 })
               }
             />
-            <ChoiceMenu
-              buttonLabel={choice.effort ? `Effort: ${choice.effort}` : 'Effort'}
-              menuLabel="Effort"
-              title="Effort · отправит /effort"
-              choices={efforts.map((e) => ({ value: e, label: e }))}
-              selected={choice.effort}
-              onSelect={(c) =>
-                void api.term.setEffort(c.value, session.name).then((r) => {
+            <EffortSlider
+              levels={efforts}
+              value={choice.effort}
+              onCommit={(level) =>
+                void api.term.setEffort(level, session.name).then((r) => {
                   setSendError(r.ok ? null : r.error.message);
-                  if (r.ok) rememberChoice(session.name, { effort: c.value });
+                  if (r.ok) rememberChoice(session.name, { effort: level });
                 })
               }
             />

@@ -99,10 +99,14 @@ test('подсказки, картинка, отправка, модель и ef
     await page.getByRole('menuitemradio', { name: /^Sonnet/ }).first().click();
     await expect.poll(() => pane(name)).toContain('/model sonnet');
     await expect(page.getByRole('button', { name: /^Модель/ })).toContainText('Sonnet');
-    await page.getByRole('button', { name: /^Effort/ }).click();
-    await page.getByRole('menuitemradio', { name: 'low' }).click();
+    // Effort — ползунок: отпустили — уходит /effort
+    const effort = page.getByRole('slider', { name: 'Effort' });
+    await effort.fill('0');
     await expect.poll(() => pane(name)).toContain('/effort low');
-    await expect(page.getByRole('button', { name: /^Effort/ })).toContainText('low');
+    await expect(page.locator('.effort-value')).toHaveText('low');
+    await effort.focus();
+    await page.keyboard.press('End');
+    await expect.poll(() => pane(name)).toContain('/effort max');
   } finally {
     await app.close();
   }
