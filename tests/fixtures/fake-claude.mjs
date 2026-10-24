@@ -4,6 +4,8 @@
 // (в том числе Enter) теряется. Пишет sessions/<pid>.json и журнал, если задан CVG_CLAUDE_DIR.
 // Команды: «menu» — меню из трёх вариантов; «menu-multi» — множественный выбор (как Claude Code 2.1.308); «busy» — 3 с «работы»; «long» — длинный ответ в журнал;
 // «grow» — ответ, который через 300 мс дописывается той же записью (тот же uuid).
+// Ответы пишут model и usage (832 300 в контексте); «/context» — вывод настоящего Claude Code 2.1.310 в журнал;
+// «/compact [текст]» — сводка сжатия и ответ с usage 20 000.
 // CVG_FAKE_SLOW_ACCEPT=1 — поле очищается через 1200 мс после Enter. CVG_FAKE_SEED — начальный журнал (копируется при старте).
 import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
@@ -30,6 +32,8 @@ let busyUntil = 0;
 let processingUntil = 0;
 let enters = 0;
 let pasteBuf = null;
+let usage = { input_tokens: 1000, cache_read_input_tokens: 820000, cache_creation_input_tokens: 11300, output_tokens: 50 };
+const CONTEXT_OUT = readFileSync(new URL('./context-2.1.310.txt', import.meta.url), 'utf8');
 
 function tmuxField() {
   try {
@@ -48,13 +52,16 @@ function writeSession(st) {
     JSON.stringify({ pid: process.pid, sessionId, cwd, tmux: tmuxField(), status: st, kind: 'interactive', version: 'fake' }));
 }
 
-function record(type, content, uuid = randomUUID()) {
+function record(type, content, uuid = randomUUID(), extra = {}) {
   if (!dir) return;
   const p = join(dir, 'projects', slug);
   mkdirSync(p, { recursive: true });
+  const timestamp = new Date().toISOString();
   const rec = type === 'user'
-    ? { type: 'user', uuid, sessionId, timestamp: new Date().toISOString(), message: { role: 'user', content } }
-    : { type: 'assistant', uuid, sessionId, timestamp: new Date().toISOString(), message: { role: 'assistant', content: [{ type: 'text', text: content }] } };
+    ? { type: 'user', uuid, sessionId, timestamp, message: { role: 'user', content }, ...extra }
+    : type === 'system'
+      ? { type: 'system', subtype: 'local_command', uuid, sessionId, timestamp, content }
+      : { type: 'assistant', uuid, sessionId, timestamp, message: { role: 'assistant', model: 'claude-sonnet-5-5', content: [{ type: 'text', text: content }], usage } };
   appendFileSync(join(p, `${sessionId}.jsonl`), `${JSON.stringify(rec)}\n`);
 }
 
@@ -85,6 +92,20 @@ function submit() {
   if (!text) return;
   const shown = pasted ? `${images ? `[Image #${images}]` : ''}${text.split('\n')[0]}` : field;
   history.push(`› ${shown}`);
+  const slash = /^\/(context|compact)\b\s*(.*)$/s.exec(text.trim());
+  if (slash) {
+    field = '';
+    pasted = null;
+    record('user', `<command-name>/${slash[1]}</command-name>\n<command-message>${slash[1]}</command-message>\n<command-args>${slash[2]}</command-args>`);
+    if (slash[1] === 'context') record('system', `<local-command-stdout>${CONTEXT_OUT}</local-command-stdout>`);
+    else {
+      record('user', 'This session is being continued from a previous conversation…', randomUUID(), { isCompactSummary: true });
+      usage = { input_tokens: 500, cache_read_input_tokens: 19500, cache_creation_input_tokens: 0, output_tokens: 10 };
+      record('assistant', 'Сжато.');
+    }
+    draw();
+    return;
+  }
   // Как настоящий Claude Code: путь к картинке → «[Image #N]» и блок image с данными
   record('user', images ? [{ type: 'text', text: `[Image #${images}]${text}` }, ...Array.from({ length: images }, () => ({ type: 'image', source: { type: 'base64', media_type: 'image/png', data: PNG_1PX } }))] : text);
   field = '';

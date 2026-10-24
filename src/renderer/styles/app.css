@@ -372,3 +372,18 @@ button.file-row { cursor: pointer; }
 .session-header .btn-kill { color: var(--danger); }
 .session-box:focus, .chat:focus { outline: none; }
 .session-box:focus-visible { outline: 1px solid var(--accent); outline-offset: -1px; border-radius: 8px; }
+
+/* ── Контекст сессии (0.5): значок в шапке и панель как «Расход» ── */
+.context-badge { white-space: nowrap; }
+.context-warn { color: var(--warn); }
+.context-danger { color: var(--danger); }
+.context-panel { top: calc(100% + 8px); bottom: auto; right: 0; width: 320px; max-height: none; padding: 12px; gap: 10px; }
+.context-panel .choice-title { padding: 0; }
+.context-bar { display: flex; }
+.context-bar .bar-fill { border-radius: 0; }
+.context-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+.context-row { display: flex; align-items: center; gap: 8px; }
+.context-dot { width: 10px; height: 10px; border-radius: 2px; flex: none; }
+.context-name { flex: 1; min-width: 0; }
+.context-pct { width: 48px; text-align: right; }
+.context-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; }

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { TmuxSession } from '@shared/ipc';
 import { killSession, setViewOverride, shortPath } from '../state';
 import { ConfirmDialog } from './ConfirmDialog';
+import { ContextBadge } from './ContextBadge';
 import { IconClose } from './icons';
 
 /** mode — что сейчас показано; переключатель «Лента | Терминал» — только когда запущен claude. */
@@ -16,6 +17,7 @@ export function SessionHeader({ session, mode = 'terminal' }: { session: TmuxSes
           {shortPath(session.cwd)} · {what}
         </span>
       </div>
+      {session.claudeRunning ? <ContextBadge key={session.name} session={session} /> : null}
       {session.claudeRunning ? (
         <div role="group" aria-label="Вид" className="seg">
           <button type="button" aria-pressed={mode === 'chat'} onClick={() => setViewOverride(null)}>Лента</button>
