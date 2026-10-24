@@ -10,6 +10,7 @@ vi.mock('../../src/renderer/api', () => ({
     tmux: { onSessions: () => () => {}, list: async () => ({ ok: true, data: [] }) },
     layout: { get: async () => ({ v: 1, items: [] }), save: async () => ({ ok: true, data: undefined }) },
     chat: { onItems: () => () => {}, onScreen: (cb: (e: ScreenEvent) => void) => ((onScreen = cb), () => {}), onUnavailable: () => () => {}, key: async () => ({ ok: true, data: undefined }) },
+    usage: { onSample: () => () => {}, get: async () => null },
     metrics: { onSample: () => () => {}, info: async () => ({ ok: false }), setActive: () => {} },
     updates: { get: async () => null, onAvailable: () => () => {}, dismissed: async () => null, dismiss: async () => {} },
   },
