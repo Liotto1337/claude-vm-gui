@@ -131,7 +131,7 @@ export interface SessionContext { used: number | null; model: string | null; sna
 import type { ContextSnapshot } from './context-parse';
 export type { ContextSnapshot, ContextCategory } from './context-parse';
 
-export interface ChatEvent { session: string; reset: boolean; prepend: boolean; items: ChatItem[]; hasEarlier: boolean }
+export interface ChatEvent { session: string; reset: boolean; prepend: boolean; items: ChatItem[]; hasEarlier: boolean; context: SessionContext }
 export interface ScreenEvent { session: string; state: ScreenState; busy: boolean }
 
 /** Порядок, закрепление и группы сессий в сайдбаре (хранится локально, отдельно для каждой ВМ). */

@@ -1,10 +1,11 @@
 import { useSyncExternalStore } from 'react';
 import type {
-  ChatItem, ConnectionState, ErrorCode, Hints, HostKeyPrompt, MenuKey, MetricsSample, PreflightEvent, PreflightStep, ScreenState, SidebarLayout, SystemInfo, TmuxSession, UsageSample, VmConfig,
+  ChatItem, ConnectionState, ErrorCode, Hints, HostKeyPrompt, MenuKey, MetricsSample, PreflightEvent, PreflightStep, ScreenState, SessionContext, SidebarLayout, SystemInfo, TmuxSession, UsageSample, VmConfig,
 } from '@shared/ipc';
 import { claimPending, nextTyping, type Pending } from './chat-anim';
 import { loadAnswers, nextAnswers, saveAnswers, type MenuAnswer } from './menu-history';
 import { mergeItems } from './view-mode';
+import { rememberWindow } from './context-window';
 import { addNewToGroup, EMPTY, reconcile } from '@shared/layout';
 import { api } from './api';
 
@@ -52,8 +53,11 @@ export interface ChatState {
   /** Итоги ответов на меню (на месте карточки) и якорь открытого меню — последний элемент журнала перед ним */
   answers: MenuAnswer[];
   menuAnchor: string | null;
+  /** Контекст сессии (значок и панель «Контекст») */
+  context: SessionContext;
 }
-const EMPTY_CHAT: ChatState = { items: [], pending: [], typing: {}, hasEarlier: false, screen: null, busy: false, unavailable: null, answers: [], menuAnchor: null };
+const EMPTY_CONTEXT: SessionContext = { used: null, model: null, snapshot: null, snapshotAt: null, snapshotModel: null };
+const EMPTY_CHAT: ChatState = { items: [], pending: [], typing: {}, hasEarlier: false, screen: null, busy: false, unavailable: null, answers: [], menuAnchor: null, context: EMPTY_CONTEXT };
 
 let state: AppState = {
   view: 'loading',
@@ -176,7 +180,9 @@ export async function init(): Promise<void> {
     patchChat(e.session, (c) => {
       const items = mergeItems(c.items, e);
       const typing = nextTyping(c.typing, c.items, e, performance.now());
-      return { items, typing, pending: claimPending(c.pending, items, Date.now(), c.busy), hasEarlier: e.hasEarlier, unavailable: null };
+      const context = e.context ?? c.context;
+      if (context.snapshot && context.snapshotModel) rememberWindow(context.snapshotModel, context.snapshot);
+      return { items, typing, pending: claimPending(c.pending, items, Date.now(), c.busy), hasEarlier: e.hasEarlier, unavailable: null, context };
     }),
   );
   // Доставленные пузыри без записи журнала уходят сами

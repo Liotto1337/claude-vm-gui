@@ -101,7 +101,7 @@ export class TranscriptService extends EventEmitter {
     this.start = tail.start;
     parseTranscriptLines(tail.lines, this.st);
     if (this.st.badStreak >= BAD_STREAK) return this.fail(UNREADABLE);
-    this.emit('items', { reset: true, prepend: false, items: [...this.st.items.values()], hasEarlier: tail.start > 0 });
+    this.emit('items', { reset: true, prepend: false, items: [...this.st.items.values()], hasEarlier: tail.start > 0, context: this.st.context });
     await this.watch(path, tail.size, gen);
   }
 
@@ -130,9 +130,12 @@ export class TranscriptService extends EventEmitter {
       if (nl < 0) return;
       const lines = buf.slice(0, nl).split('\n');
       buf = buf.slice(nl + 1);
+      const context = this.st.context;
       const r = parseTranscriptLines(lines, this.st);
       if (this.st.badStreak >= BAD_STREAK) return this.fail(UNREADABLE);
-      if (r.changed.length) this.emit('items', { reset: false, prepend: false, items: r.changed, hasEarlier: this.start > 0 });
+      // замер /context новых элементов ленты не даёт, но событие нужно
+      if (r.changed.length || this.st.context !== context)
+        this.emit('items', { reset: false, prepend: false, items: r.changed, hasEarlier: this.start > 0, context: this.st.context });
     });
   }
 
@@ -150,7 +153,7 @@ export class TranscriptService extends EventEmitter {
     if (gen !== this.gen) return ok(undefined);
     this.start = part.start;
     const r = parseTranscriptLines(part.lines, this.st, true);
-    this.emit('items', { reset: false, prepend: true, items: r.changed, hasEarlier: this.start > 0 });
+    this.emit('items', { reset: false, prepend: true, items: r.changed, hasEarlier: this.start > 0, context: this.st.context });
     return ok(undefined);
   }
 

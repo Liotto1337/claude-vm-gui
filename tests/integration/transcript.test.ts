@@ -44,6 +44,20 @@ describe.skipIf(!hasTestKey)('журнал Claude Code по SSH', () => {
     svc.stop();
   });
 
+  it('вывод /context без новых элементов ленты всё равно приходит событием с замером', async () => {
+    const path = join(dir, 'ctx.jsonl');
+    writeFileSync(path, FIXTURE);
+    const svc = new TranscriptService(conn);
+    const { events } = collect(svc);
+    await svc.follow(path);
+    const out = readFileSync(join(__dirname, '../fixtures/context-2.1.310.txt'), 'utf8');
+    appendFileSync(path, `${JSON.stringify({ type: 'system', subtype: 'local_command', uuid: 'ctx-1', timestamp: '2026-10-24T12:00:00.000Z', content: `<local-command-stdout>${out}</local-command-stdout>` })}\n`);
+    await expect.poll(() => events.length, { timeout: 5000 }).toBeGreaterThan(1);
+    expect(events[1].items).toEqual([]);
+    expect(events[1].context.snapshot?.window).toBe(1_000_000);
+    svc.stop();
+  });
+
   it('строка, дописанная по частям, собирается целиком', async () => {
     const path = join(dir, 'parts.jsonl');
     writeFileSync(path, '');
