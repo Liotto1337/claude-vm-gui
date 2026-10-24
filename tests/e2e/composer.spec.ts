@@ -190,3 +190,26 @@ test('прикрепить любой файл: значок и имя, путь
     await app.close();
   }
 });
+
+test('effort ползунком: клик по середине при неизвестном уровне отправляет его, стрелки — одна команда после паузы', async () => {
+  const { app, page } = await openWith(['cat'], { CVG_FAKE_CLAUDE: '1' });
+  try {
+    const effort = page.getByRole('slider', { name: 'Effort' });
+    await expect(page.locator('.effort-value')).toHaveText('—');
+    // Бегунок уже на середине: клик туда не меняет значения (нет change), но выбор должен уйти
+    await effort.click();
+    await expect.poll(() => pane(name), { timeout: 10_000 }).toMatch(/\/effort \w+/);
+    // cat повторяет введённую строку — одна команда видна на экране дважды
+    const count = () => (pane(name).match(/\/effort /g) ?? []).length / 2;
+    const before = count();
+    await effort.focus();
+    await page.keyboard.press('ArrowRight');
+    await page.keyboard.press('ArrowRight');
+    await page.keyboard.press('ArrowLeft');
+    await expect.poll(count, { timeout: 10_000 }).toBe(before + 1);
+    await page.waitForTimeout(1500);
+    expect(count()).toBe(before + 1);
+  } finally {
+    await app.close();
+  }
+});

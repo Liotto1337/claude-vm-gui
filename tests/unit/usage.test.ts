@@ -21,10 +21,20 @@ describe('parseUsage', () => {
     });
   });
   it('без подписки (нет токена, ошибка сервиса) — только токены', () => {
+    expect(parseUsage('__cvg_limits__\n__cvg_nolimits__\n\n__cvg_tokens__\n0 0 0 0\n', 1).limits).toBeNull();
     expect(parseUsage('__cvg_limits__\n\n__cvg_tokens__\n0 0 0 0\n', 1).limits).toBeNull();
     expect(parseUsage('__cvg_limits__\n{"type":"error","error":{"message":"x"}}\n__cvg_tokens__\n1 2 3 4\n', 1)).toMatchObject({
       limits: null, tokens: { input: 1, output: 2, cacheWrite: 3, cacheRead: 4 },
     });
+  });
+  it('сервис лимитов не ответил или команда оборвана — прежние значения остаются, а «нет подписки» — стирает', () => {
+    const prev = parseUsage(`__cvg_limits__\n${LIMITS}\n__cvg_tokens__\n1 2 3 4\n`, 1);
+    const failed = parseUsage('__cvg_limits__\n\n__cvg_tokens__\n5 6 7 8\n', 2, prev);
+    expect(failed.limits).toEqual(prev.limits);
+    expect(failed.tokens).toEqual({ input: 5, output: 6, cacheWrite: 7, cacheRead: 8 });
+    const cut = parseUsage(`__cvg_limits__\n${LIMITS}\n__cvg_tokens__\n`, 3, prev);
+    expect(cut.tokens).toEqual(prev.tokens);
+    expect(parseUsage('__cvg_limits__\n__cvg_nolimits__\n\n__cvg_tokens__\n1 1 1 1\n', 4, prev).limits).toBeNull();
   });
   it('мусор — ошибка, а не исключение', () => expect(parseUsage('что-то', 1)).toMatchObject({ limits: null, tokens: null, error: 'нет данных' }));
 });
@@ -46,10 +56,12 @@ describe('форматирование', () => {
 
 describe('usageCommand', () => {
   const cmd = usageCommand('/home/u/.claude');
-  it('токен подписки не попадает в аргументы процессов (curl читает заголовок из stdin)', () => {
+  it('токен подписки не попадает в аргументы процессов: заголовок — here-doc в stdin curl, не printf', () => {
     expect(cmd).toContain('curl -s -m 10 -K -');
     expect(cmd).toContain('api.anthropic.com/api/oauth/usage');
     expect(cmd).not.toMatch(/-H\s+["']?Authorization/);
+    expect(cmd).not.toMatch(/printf[^\n]*Bearer/);
+    expect(cmd).toMatch(/<<\s*'?CVG_EOF'?\nheader = "Authorization: Bearer \$t"\nCVG_EOF/);
   });
   it('каталог — в кавычках', () => expect(usageCommand("/tmp/a b'c")).toContain(`'/tmp/a b'\\''c'`));
 });

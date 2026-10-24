@@ -30,7 +30,7 @@ export class UsagePoller {
   private async tick(): Promise<void> {
     try {
       const r = await this.exec(usageCommand(this.claudeDir), { timeoutMs: 20_000 });
-      const s = parseUsage(r.stdout, Date.now());
+      const s = parseUsage(r.stdout, Date.now(), this.latest);
       if (s.error) return;
       this.latest = s;
       for (const cb of this.listeners) cb(s);

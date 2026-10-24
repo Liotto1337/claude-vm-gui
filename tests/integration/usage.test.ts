@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { SshConnection } from '../../src/main/ssh';
-import { parseUsage, usageCommand } from '../../src/shared/usage';
+import { oauthTokenCommand, parseUsage, usageCommand } from '../../src/shared/usage';
 import { hasTestKey, tempKnownHosts, testConfig } from './helpers';
 
 describe.skipIf(!hasTestKey)('расход Claude: команда на ВМ', () => {
@@ -46,5 +46,19 @@ describe.skipIf(!hasTestKey)('расход Claude: команда на ВМ', ()
     const s = parseUsage(r.stdout, 1);
     expect(s.tokens).toEqual({ input: 11, output: 27, cacheWrite: 103, cacheRead: 1004 });
     expect(s.limits).toBeNull();
+  });
+
+  it('токен подписки — только из claudeAiOauth, не токен MCP-сервера; файл в одну строку и с переносами', async () => {
+    const one = JSON.stringify({
+      claudeAiOauth: { accessToken: 'sk-ant-oat01-MAIN', refreshToken: 'r', scopes: ['user:inference', 'user:profile'], subscriptionType: 'pro' },
+      mcpOAuth: { 'linear|ab': { serverName: 'linear', accessToken: 'LINEAR-TOKEN' } },
+    });
+    writeFileSync(join(dir, '.credentials.json'), one);
+    expect((await conn.exec(`${oauthTokenCommand(dir)}; printf %s "$t"`)).stdout).toBe('sk-ant-oat01-MAIN');
+    writeFileSync(join(dir, '.credentials.json'), JSON.stringify(JSON.parse(one), null, 2));
+    expect((await conn.exec(`${oauthTokenCommand(dir)}; printf %s "$t"`)).stdout).toBe('sk-ant-oat01-MAIN');
+    writeFileSync(join(dir, '.credentials.json'), JSON.stringify({ mcpOAuth: { x: { accessToken: 'ONLY-MCP' } } }));
+    expect((await conn.exec(`${oauthTokenCommand(dir)}; printf %s "$t"`)).stdout).toBe('');
+    rmSync(join(dir, '.credentials.json'));
   });
 });

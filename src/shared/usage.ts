@@ -4,6 +4,7 @@ import { shellQuote } from './quote';
 
 const LIMITS = '__cvg_limits__';
 const TOKENS = '__cvg_tokens__';
+const NOLIMITS = '__cvg_nolimits__';
 
 /**
  * Токены ответа — по message.id: Claude Code пишет один ответ несколькими записями (по блоку на запись)
@@ -22,15 +23,26 @@ const AWK = String.raw`function num(k,  p) { p = index($0, k); return p ? substr
 END { for (k in O) { si += I[k]; so += O[k]; sw += W[k]; sr += R[k] }; printf "%d %d %d %d\n", si, so, sw, sr }`;
 
 /**
- * Команда для ВМ. Лимиты — сервис Anthropic, которым пользуется /usage, с токеном подписки из .credentials.json:
- * токен остаётся на ВМ и не попадает в аргументы процессов (curl читает заголовок из stdin).
+ * Токен подписки в переменную t: строго из claudeAiOauth — в том же файле лежат токены MCP-серверов (mcpOAuth),
+ * им на api.anthropic.com не место. Строки склеиваются: файл бывает и в одну строку, и с переносами.
+ */
+export const oauthTokenCommand = (claudeDir: string): string =>
+  `t=$(tr -d '\n\r' < ${shellQuote(claudeDir)}/.credentials.json 2>/dev/null | sed -n 's/.*"claudeAiOauth" *: *{[^}]*"accessToken" *: *"\\([^"]*\\)".*/\\1/p')`;
+
+/**
+ * Команда для ВМ. Лимиты — сервис Anthropic, которым пользуется /usage, с токеном подписки: токен остаётся на ВМ
+ * и не попадает в аргументы процессов (заголовок — here-doc в stdin curl). Нет токена — NOLIMITS (нет подписки),
+ * сервис не ответил — пусто (прежние лимиты остаются).
  */
 export function usageCommand(claudeDir: string): string {
   const d = shellQuote(claudeDir);
   return [
     `echo ${LIMITS}`,
-    `t=$(sed -n 's/.*"accessToken" *: *"\\([^"]*\\)".*/\\1/p' ${d}/.credentials.json 2>/dev/null | head -n 1)`,
-    `if [ -n "$t" ]; then printf 'header = "Authorization: Bearer %s"\\n' "$t" | curl -s -m 10 -K - -H 'anthropic-beta: oauth-2025-04-20' https://api.anthropic.com/api/oauth/usage; fi`,
+    oauthTokenCommand(claudeDir),
+    `if [ -n "$t" ]; then curl -s -m 10 -K - -H 'anthropic-beta: oauth-2025-04-20' https://api.anthropic.com/api/oauth/usage <<CVG_EOF`,
+    'header = "Authorization: Bearer $t"',
+    'CVG_EOF',
+    `else echo ${NOLIMITS}; fi`,
     'unset t',
     `echo; echo ${TOKENS}`,
     // Начало суток по часам ВМ — в UTC, как отметки времени журнала (date -u -d «дата 00:00» понял бы полночь как UTC)
@@ -45,22 +57,26 @@ const usageWindow = (w: unknown): UsageWindow | null => {
   return { pct: Math.round(Math.min(100, Math.max(0, x.utilization))), resetsAt: typeof x.resets_at === 'string' ? x.resets_at : null };
 };
 
-/** Вывод usageCommand → замер; без подписки или при ошибке сервиса лимитов — limits: null. */
-export function parseUsage(out: string, now: number): UsageSample {
+/**
+ * Вывод usageCommand → замер. Нет токена подписки — limits: null. Сервис лимитов не ответил или вывод оборван —
+ * берутся прежние значения (prev), иначе полоски мигали бы при каждом сбое сети.
+ */
+export function parseUsage(out: string, now: number, prev: UsageSample | null = null): UsageSample {
   const a = out.indexOf(LIMITS);
   const b = out.indexOf(TOKENS);
   if (a < 0 || b < 0) return { t: now, limits: null, tokens: null, error: 'нет данных' };
-  let limits: UsageSample['limits'] = null;
+  const part = out.slice(a + LIMITS.length, b);
+  let limits: UsageSample['limits'] = part.includes(NOLIMITS) ? null : (prev?.limits ?? null);
   try {
-    const j = JSON.parse(out.slice(a + LIMITS.length, b).trim() || 'null') as Record<string, unknown> | null;
+    const j = JSON.parse(part.trim() || 'null') as Record<string, unknown> | null;
     const fiveHour = usageWindow(j?.five_hour);
     const week = usageWindow(j?.seven_day);
     if (fiveHour || week) limits = { fiveHour, week };
   } catch {
-    // не JSON (нет сети, ошибка сервиса) — лимитов нет
+    // не JSON (нет сети, ошибка сервиса) — прежние лимиты
   }
   const n = out.slice(b + TOKENS.length).trim().split(/\s+/).map(Number);
-  const tokens = n.length === 4 && n.every((x) => Number.isFinite(x)) ? { input: n[0], output: n[1], cacheWrite: n[2], cacheRead: n[3] } : null;
+  const tokens = n.length === 4 && n.every((x) => Number.isFinite(x)) ? { input: n[0], output: n[1], cacheWrite: n[2], cacheRead: n[3] } : (prev?.tokens ?? null);
   return { t: now, limits, tokens, error: limits || tokens ? null : 'нет данных' };
 }
 
