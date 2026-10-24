@@ -198,9 +198,9 @@ describe('контекст сессии', () => {
   it('«занято» и модель — по последнему ответу', () => {
     const st = newParseState();
     parseTranscriptLines([answer('a1', { r: 990 })], st);
-    expect(st.context).toMatchObject({ used: 1000, model: 'claude-sonnet-5-5' });
+    expect(st.context).toMatchObject({ used: 1003, model: 'claude-sonnet-5-5', usedAt: Date.parse('2026-10-24T12:00:00.000Z') });
     parseTranscriptLines([answer('a2', { r: 1990 })], st);
-    expect(st.context.used).toBe(2000);
+    expect(st.context.used).toBe(2003);
   });
 
   it('/context и его вывод — не в ленте, замер в состоянии', () => {
@@ -224,8 +224,9 @@ describe('контекст сессии', () => {
   it('сводка сжатия сбрасывает «занято», замер остаётся', () => {
     const st = newParseState();
     parseTranscriptLines([answer('a1', { r: 990 }), contextOut()], st);
-    parseTranscriptLines([JSON.stringify({ type: 'user', uuid: 's1', isCompactSummary: true, message: { content: 'This session is being continued…' } })], st);
+    parseTranscriptLines([JSON.stringify({ type: 'user', uuid: 's1', timestamp: '2026-10-24T13:00:00.000Z', isCompactSummary: true, message: { content: 'This session is being continued…' } })], st);
     expect(st.context.used).toBeNull();
+    expect(st.context.usedAt).toBe(Date.parse('2026-10-24T13:00:00.000Z'));
     expect(st.context.snapshot).not.toBeNull();
   });
 
@@ -235,6 +236,37 @@ describe('контекст сессии', () => {
     const before = { ...st.context };
     parseTranscriptLines([answer('a0', { r: 90 }, 'claude-opus-5-5'), contextOut('c0', '2026-10-01T00:00:00.000Z')], st, true);
     expect(st.context).toEqual(before);
+  });
+
+  it('модель замера — из вывода /context, а не из последнего ответа (после /model ответа ещё нет)', () => {
+    const st = newParseState();
+    parseTranscriptLines([answer('a1', { r: 990 }, 'claude-opus-5-5'), contextCmd, contextOut()], st);
+    expect(st.context.model).toBe('claude-opus-5-5');
+    expect(st.context.snapshotModel).toBe('claude-sonnet-5-5');
+  });
+
+  it('вывод после команды /context скрыт при любом формате и типе записи', () => {
+    const st = newParseState();
+    const odd = JSON.stringify({ type: 'user', uuid: 'o1', message: { content: '<local-command-stdout>Context usage: 12% of 200k</local-command-stdout>' } });
+    const r = parseTranscriptLines([contextCmd, odd], st);
+    expect(r.changed).toEqual([]);
+    // следующий вывод другой команды — снова в ленте
+    const r2 = parseTranscriptLines([JSON.stringify({ type: 'system', subtype: 'local_command', uuid: 'o2', content: '<local-command-stdout>Готово</local-command-stdout>' })], st);
+    expect(r2.changed).toMatchObject([{ kind: 'note', text: 'Готово' }]);
+  });
+
+  it('вывод /context в записи пользователя (старый формат) — тоже замер', () => {
+    const st = newParseState();
+    const u = JSON.stringify({ type: 'user', uuid: 'u1', timestamp: '2026-10-24T12:40:00.000Z', message: { content: `<local-command-stdout>${CONTEXT_OUT}</local-command-stdout>` } });
+    const r = parseTranscriptLines([u], st);
+    expect(r.changed).toEqual([]);
+    expect(st.context.snapshot?.window).toBe(1_000_000);
+  });
+
+  it('/compact с «Context Usage» в аргументах остаётся в ленте', () => {
+    const st = newParseState();
+    const r = parseTranscriptLines([JSON.stringify({ type: 'system', subtype: 'local_command', uuid: 'k2', content: '<command-name>/compact</command-name>\n<command-args>про Context Usage</command-args>' })], st);
+    expect(r.changed).toMatchObject([{ kind: 'user', text: '/compact про Context Usage' }]);
   });
 
   it('/compact — обычная строка пользователя', () => {

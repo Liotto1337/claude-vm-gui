@@ -126,8 +126,18 @@ export type ChatItem =
       kind: 'tool'; id: string; name: string; summary: string; input: string;
       status: 'running' | 'ok' | 'error'; result: string | null; children: ChatItem[];
     };
-/** Контекст сессии: «занято» по последнему ответу, разбивка — последний замер /context (ms по timestamp записи) */
-export interface SessionContext { used: number | null; model: string | null; snapshot: ContextSnapshot | null; snapshotAt: number | null; snapshotModel: string | null }
+/**
+ * Контекст сессии: «занято» по последнему ответу (usedAt — его время или время сжатия, после которого used = null),
+ * разбивка — последний замер /context; времена — ms по timestamp записей.
+ */
+export interface SessionContext {
+  used: number | null;
+  usedAt: number | null;
+  model: string | null;
+  snapshot: ContextSnapshot | null;
+  snapshotAt: number | null;
+  snapshotModel: string | null;
+}
 import type { ContextSnapshot } from './context-parse';
 export type { ContextSnapshot, ContextCategory } from './context-parse';
 

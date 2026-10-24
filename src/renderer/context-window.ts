@@ -25,10 +25,28 @@ export function rememberWindow(model: string, w: Win): void {
   }
 }
 
-/** Замер той же модели → он; иначе запомненное по модели; иначе null. */
+/** Замер не старше последнего ответа (или сжатия) — он сейчас вернее журнала */
+const snapshotIsLatest = (ctx: SessionContext) =>
+  ctx.snapshot !== null && ctx.snapshotAt !== null && (ctx.usedAt === null || ctx.snapshotAt >= ctx.usedAt);
+
+/** Замер новее ответа или той же модели → он; иначе запомненное по модели; иначе null. */
 export function windowFor(ctx: SessionContext): Win | null {
-  if (ctx.snapshot && ctx.snapshotModel === ctx.model) return { window: ctx.snapshot.window, buffer: ctx.snapshot.buffer };
+  if (ctx.snapshot && (snapshotIsLatest(ctx) || ctx.snapshotModel === ctx.model)) return { window: ctx.snapshot.window, buffer: ctx.snapshot.buffer };
   if (!ctx.model) return null;
   const w = load()[ctx.model];
   return w && typeof w.window === 'number' && w.window > 0 ? { window: w.window, buffer: Number(w.buffer) || 0 } : null;
+}
+
+/** Расхождение замера и журнала, при котором разбивка ещё считается текущей (доля окна) */
+const SAME_SHARE = 0.01;
+
+/**
+ * Сколько занято сейчас и годится ли разбивка замера для полоски. Замер новее ответа (после /compact, в новой
+ * сессии, после /model) — число из него; иначе из журнала, а категории — только если замер почти совпадает.
+ */
+export function contextNow(ctx: SessionContext): { used: number | null; fresh: boolean } {
+  const snap = ctx.snapshot;
+  if (snap && snapshotIsLatest(ctx)) return { used: snap.used, fresh: true };
+  const fresh = !!snap && ctx.used !== null && Math.abs(snap.used - ctx.used) <= snap.window * SAME_SHARE;
+  return { used: ctx.used, fresh };
 }

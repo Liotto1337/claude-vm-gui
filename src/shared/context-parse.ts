@@ -12,7 +12,8 @@ export interface ContextCategory {
   /** Значок приглушён (Free space) */
   dim: boolean;
 }
-export interface ContextSnapshot { used: number; window: number; buffer: number; categories: ContextCategory[] }
+/** model — id модели из вывода (строка «claude-…» над итогом), если есть */
+export interface ContextSnapshot { used: number; window: number; buffer: number; categories: ContextCategory[]; model: string | null }
 export interface ContextView { used: number | null; window: number | null; pct: number | null; toAutocompact: number | null; level: 'ok' | 'warn' | 'danger' }
 
 const WARN_PCT = 80;
@@ -55,15 +56,17 @@ function glyphStyle(raw: string, name: string): { color: string | null; dim: boo
 /** Вывод /context → замер; другой формат — null. */
 export function parseContextOutput(stdout: string): ContextSnapshot | null {
   let snap: ContextSnapshot | null = null;
+  let model: string | null = null;
   for (const raw of stdout.split('\n')) {
     const line = stripAnsi(raw);
     if (!snap) {
+      model ??= /(?:^|\s)(claude-[a-z0-9][a-z0-9.\-[\]]*)\s*$/i.exec(line)?.[1] ?? null;
       const t = TOTAL.exec(line);
       if (t) {
         const used = parseTokenCount(t[1]);
         const window = parseTokenCount(t[2]);
         if (used === null || !window) return null;
-        snap = { used, window, buffer: 0, categories: [] };
+        snap = { used, window, buffer: 0, categories: [], model };
       }
       continue;
     }
@@ -78,14 +81,14 @@ export function parseContextOutput(stdout: string): ContextSnapshot | null {
   return snap;
 }
 
-/** Ответ основной ветки с usage → сколько сейчас в контексте и модель; иначе null. */
+/** Ответ основной ветки с usage → сколько сейчас в контексте (вход, кэш и сам ответ) и модель; иначе null. */
 export function usedFromAssistant(rec: Record<string, unknown>): { used: number; model: string } | null {
   if (rec.type !== 'assistant' || rec.isSidechain === true) return null;
   const msg = rec.message as { model?: unknown; usage?: Record<string, unknown> } | undefined;
   const u = msg?.usage;
   if (!u || typeof msg?.model !== 'string' || msg.model === '<synthetic>') return null;
   const n = (k: string) => (typeof u[k] === 'number' ? (u[k] as number) : 0);
-  return { used: n('input_tokens') + n('cache_read_input_tokens') + n('cache_creation_input_tokens'), model: msg.model };
+  return { used: n('input_tokens') + n('cache_read_input_tokens') + n('cache_creation_input_tokens') + n('output_tokens'), model: msg.model };
 }
 
 /** Производные величины для значка и панели. */

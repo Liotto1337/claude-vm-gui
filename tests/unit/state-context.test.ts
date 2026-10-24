@@ -29,11 +29,11 @@ describe('контекст в состоянии ленты', () => {
     const state = await import('../../src/renderer/state');
     const { windowFor } = await import('../../src/renderer/context-window');
     await state.init();
-    const snapshot = { used: 29_700, window: 1_000_000, buffer: 33_000, categories: [] };
-    onItems({ session: 'A', reset: true, prepend: false, items: [], hasEarlier: false, context: { used: 5000, model: 'm1', snapshot, snapshotAt: 1, snapshotModel: 'm1' } });
-    onItems({ session: 'B', reset: true, prepend: false, items: [], hasEarlier: false, context: { used: 7, model: 'm2', snapshot: null, snapshotAt: null, snapshotModel: null } });
+    const snapshot = { used: 29_700, window: 1_000_000, buffer: 33_000, categories: [], model: 'm1' };
+    onItems({ session: 'A', reset: true, prepend: false, items: [], hasEarlier: false, context: { used: 5000, usedAt: 0, model: 'm1', snapshot, snapshotAt: 1, snapshotModel: 'm1' } });
+    onItems({ session: 'B', reset: true, prepend: false, items: [], hasEarlier: false, context: { used: 7, usedAt: 0, model: 'm2', snapshot: null, snapshotAt: null, snapshotModel: null } });
     expect(state.getState().chat.A.context.used).toBe(5000);
     expect(state.getState().chat.B.context.used).toBe(7);
-    expect(windowFor({ used: 1, model: 'm1', snapshot: null, snapshotAt: null, snapshotModel: null })).toEqual({ window: 1_000_000, buffer: 33_000 });
+    expect(windowFor({ used: 1, usedAt: 0, model: 'm1', snapshot: null, snapshotAt: null, snapshotModel: null })).toEqual({ window: 1_000_000, buffer: 33_000 });
   });
 });

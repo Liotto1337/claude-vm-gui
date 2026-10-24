@@ -22,7 +22,7 @@ test.beforeEach(() => {
   const seed = join(claudeDir, 'seed.jsonl');
   const answer = JSON.stringify({
     type: 'assistant', uuid: 'a1', timestamp: new Date().toISOString(),
-    message: { model: 'claude-sonnet-5-5', content: [{ type: 'text', text: 'Готово.' }], usage: { input_tokens: 1000, cache_read_input_tokens: 820_000, cache_creation_input_tokens: 11_300, output_tokens: 50 } },
+    message: { model: 'claude-sonnet-5-5', content: [{ type: 'text', text: 'Готово.' }], usage: { input_tokens: 1000, cache_read_input_tokens: 820_000, cache_creation_input_tokens: 11_250, output_tokens: 50 } },
   });
   writeFileSync(seed, `${answer}\n`);
   tmux('new-session', '-d', '-s', 'cvg-ctx-a', '-x', '120', '-y', '40', `CVG_CLAUDE_DIR=${claudeDir} CVG_FAKE_SEED=${seed} node ${FAKE}`);
@@ -98,7 +98,28 @@ test('«Сжать сессию»: диалог с пожеланиями → /c
     await dialog.getByRole('button', { name: 'Сжать' }).click();
     await expect.poll(() => commands('/compact'), { timeout: 10_000 }).toBe(1);
     await expect.poll(() => tmux('capture-pane', '-p', '-t', 'cvg-ctx-a'), { timeout: 10_000 }).toContain('› /compact сохрани план');
+    // после сжатия ответа ещё нет: сколько занято — неизвестно, а не прежние 83 %
+    await expect(badge(page)).toHaveText('Контекст —', { timeout: 10_000 });
+    // свежий /context после сжатия (через 10 с) даёт число и без ответа
+    await page.waitForTimeout(10_500);
+    await badge(page).click();
+    await expect.poll(() => commands('/context'), { timeout: 10_000 }).toBe(2);
     await expect(badge(page)).toHaveText('Контекст 2 %', { timeout: 10_000 });
+  } finally {
+    await app.close();
+  }
+});
+
+test('/context, набранный в поле ввода, не висит пузырём в ленте', async () => {
+  const { app, page } = await open();
+  try {
+    await expect(badge(page)).toHaveText('Контекст 832.3k', { timeout: 15_000 });
+    await page.getByRole('textbox', { name: 'Сообщение для Claude' }).fill('/context');
+    await page.getByRole('textbox', { name: 'Сообщение для Claude' }).press('Enter');
+    await expect.poll(() => commands('/context'), { timeout: 10_000 }).toBe(1);
+    await expect(badge(page)).toHaveText('Контекст 83 %', { timeout: 10_000 });
+    await page.waitForTimeout(1000);
+    await expect(page.getByRole('region', { name: 'Переписка' }).getByText('/context')).toHaveCount(0);
   } finally {
     await app.close();
   }

@@ -10,6 +10,7 @@ describe('parseContextOutput', () => {
     expect(s.used).toBe(29_700);
     expect(s.window).toBe(1_000_000);
     expect(s.buffer).toBe(33_000);
+    expect(s.model).toBe('claude-sonnet-5-5');
     expect(s.categories.map((c) => [c.name, c.tokens, c.pct])).toEqual([
       ['System prompt', 2800, 0.3],
       ['System tools', 13_400, 1.3],
@@ -34,7 +35,7 @@ describe('parseContextOutput', () => {
   });
 
   it('итог без категорий → снимок с пустыми категориями и буфером 0', () => {
-    expect(parseContextOutput(' Context Usage\n  29.7k/1m tokens (3%)\n')).toEqual({ used: 29_700, window: 1_000_000, buffer: 0, categories: [] });
+    expect(parseContextOutput(' Context Usage\n  29.7k/1m tokens (3%)\n')).toEqual({ used: 29_700, window: 1_000_000, buffer: 0, categories: [], model: null });
   });
 });
 
@@ -53,8 +54,8 @@ describe('usedFromAssistant', () => {
     ...extra,
     message: { model: 'claude-sonnet-5-5', usage: { input_tokens: 10, cache_read_input_tokens: 800, cache_creation_input_tokens: 190, output_tokens: 5 }, ...msg },
   });
-  it('вход + чтение кэша + запись в кэш', () => {
-    expect(usedFromAssistant(rec())).toEqual({ used: 1000, model: 'claude-sonnet-5-5' });
+  it('вход + чтение и запись кэша + вывод (ответ тоже остаётся в контексте)', () => {
+    expect(usedFromAssistant(rec())).toEqual({ used: 1005, model: 'claude-sonnet-5-5' });
   });
   it('субагент, <synthetic>, без usage → null', () => {
     expect(usedFromAssistant(rec({ isSidechain: true }))).toBeNull();

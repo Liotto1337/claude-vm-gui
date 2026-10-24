@@ -5,7 +5,7 @@
 // Команды: «menu» — меню из трёх вариантов; «menu-multi» — множественный выбор (как Claude Code 2.1.308); «busy» — 3 с «работы»; «long» — длинный ответ в журнал;
 // «grow» — ответ, который через 300 мс дописывается той же записью (тот же uuid).
 // Ответы пишут model и usage (832 300 в контексте); «/context» — вывод настоящего Claude Code 2.1.310 в журнал;
-// «/compact [текст]» — сводка сжатия и ответ с usage 20 000.
+// «/compact [текст]» — только сводка сжатия (как настоящий: ответа с usage до следующего сообщения нет).
 // CVG_FAKE_SLOW_ACCEPT=1 — поле очищается через 1200 мс после Enter. CVG_FAKE_SEED — начальный журнал (копируется при старте).
 import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
@@ -32,8 +32,12 @@ let busyUntil = 0;
 let processingUntil = 0;
 let enters = 0;
 let pasteBuf = null;
-let usage = { input_tokens: 1000, cache_read_input_tokens: 820000, cache_creation_input_tokens: 11300, output_tokens: 50 };
+const usage = { input_tokens: 1000, cache_read_input_tokens: 820000, cache_creation_input_tokens: 11250, output_tokens: 50 };
 const CONTEXT_OUT = readFileSync(new URL('./context-2.1.310.txt', import.meta.url), 'utf8');
+// Сколько в контексте для итога /context: как в журнале, после /compact — 20k
+let contextUsed = usage.input_tokens + usage.cache_read_input_tokens + usage.cache_creation_input_tokens + usage.output_tokens;
+const contextOut = () =>
+  CONTEXT_OUT.replace('29.7k/1m tokens (3%)', `${Math.round(contextUsed / 100) / 10}k/1m tokens (${Math.round(contextUsed / 10_000)}%)`);
 
 function tmuxField() {
   try {
@@ -97,11 +101,10 @@ function submit() {
     field = '';
     pasted = null;
     record('user', `<command-name>/${slash[1]}</command-name>\n<command-message>${slash[1]}</command-message>\n<command-args>${slash[2]}</command-args>`);
-    if (slash[1] === 'context') record('system', `<local-command-stdout>${CONTEXT_OUT}</local-command-stdout>`);
+    if (slash[1] === 'context') record('system', `<local-command-stdout>${contextOut()}</local-command-stdout>`);
     else {
       record('user', 'This session is being continued from a previous conversation…', randomUUID(), { isCompactSummary: true });
-      usage = { input_tokens: 500, cache_read_input_tokens: 19500, cache_creation_input_tokens: 0, output_tokens: 10 };
-      record('assistant', 'Сжато.');
+      contextUsed = 20_000;
     }
     draw();
     return;

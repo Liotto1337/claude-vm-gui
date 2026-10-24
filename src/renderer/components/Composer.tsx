@@ -18,6 +18,8 @@ const FALLBACK_MODELS: ModelInfo[] = [
   { value: 'sonnet', displayName: 'Sonnet', description: '', efforts: [] },
 ];
 const FALLBACK_EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'];
+/** Команды, которых нет в ленте: пузырь «отправлено» им не нужен */
+const HIDDEN_COMMAND = /^\/context(\s|$)/;
 
 /**
  * Поле ввода. menu — открытое меню Claude Code (карточка в ленте, поле неактивно);
@@ -126,7 +128,8 @@ export function Composer({ session, menu = null, working = false, chatMode = fal
     setBusy(true);
     // Сообщение сразу в ленте (темнее), а поле — сразу пустое: можно набирать следующее, пока идёт отправка
     const sent = getDraft(session.name);
-    const pendingId = addPending(session.name, text.trim(), ready.map((a) => a.remotePath!));
+    // /context в ленте не показывается (его данные — в панели «Контекст»), пузырь ему не нужен
+    const pendingId = HIDDEN_COMMAND.test(text.trim()) ? null : addPending(session.name, text.trim(), ready.map((a) => a.remotePath!));
     setDraft(session.name, { text: '', attachments: [] });
     setTextAndCaret('', 0);
     const r = await api.term.send(sent.text, ready.map((a) => a.remotePath!), session.name).finally(() => {
@@ -134,12 +137,12 @@ export function Composer({ session, menu = null, working = false, chatMode = fal
       setBusy(false);
     });
     if (!r.ok) {
-      dropPending(session.name, pendingId);
+      if (pendingId) dropPending(session.name, pendingId);
       setSendError(r.error.message);
       restoreFailed(session.name, sent);
       return;
     }
-    markPendingSent(session.name, pendingId);
+    if (pendingId) markPendingSent(session.name, pendingId);
     setSendError(null);
     for (const a of sent.attachments) revoke(a);
   };

@@ -35,11 +35,14 @@ export interface ParseState {
   badStreak: number;
   /** Контекст сессии (только по живой части журнала) */
   context: SessionContext;
+  /** Была команда /context — следующий вывод локальной команды её (скрывается при любом формате) */
+  awaitContextOut: boolean;
 }
 
 export const newParseState = (): ParseState => ({
   items: new Map(), toolOwner: new Map(), orphanResults: new Map(), activeTask: null, taskPrompts: new Map(), sideOwner: new Map(), badStreak: 0,
-  context: { used: null, model: null, snapshot: null, snapshotAt: null, snapshotModel: null },
+  context: { used: null, usedAt: null, model: null, snapshot: null, snapshotAt: null, snapshotModel: null },
+  awaitContextOut: false,
 });
 
 const MAX_RESULT_LINES = 200;
@@ -170,6 +173,7 @@ function special(id: string, text: string): ChatItem | null | 'skip' {
 export function parseTranscriptLines(lines: string[], st: ParseState, earlier = false): { changed: ChatItem[]; bad: number } {
   const live = st.activeTask;
   const context = st.context;
+  const awaiting = st.awaitContextOut;
   if (earlier) st.activeTask = null;
   try {
     return parseLines(lines, st);
@@ -177,6 +181,7 @@ export function parseTranscriptLines(lines: string[], st: ParseState, earlier = 
     if (earlier) {
       st.activeTask = live;
       st.context = context;
+      st.awaitContextOut = awaiting;
     }
   }
 }
@@ -192,6 +197,28 @@ function parseLines(lines: string[], st: ParseState): { changed: ChatItem[]; bad
   const touch = (id: string) => {
     const it = st.items.get(id);
     if (it && !changed.has(id)) changed.set(id, it);
+  };
+
+  const timeOf = (rec: Record<string, unknown>) => {
+    const t = typeof rec.timestamp === 'string' ? Date.parse(rec.timestamp) : NaN;
+    return Number.isFinite(t) ? t : Date.now();
+  };
+  /**
+   * /context и его вывод — замер для панели «Контекст», не в ленту. Вывод узнаётся по команде перед ним
+   * (любой формат, любой тип записи) или по заголовку «Context Usage». true — запись поглощена.
+   */
+  const contextRecord = (text: string, rec: Record<string, unknown>): boolean => {
+    const cmd = tag(text, 'command-name');
+    if (cmd !== null) {
+      st.awaitContextOut = cmd.trim() === '/context';
+      return st.awaitContextOut;
+    }
+    const out = tag(text, 'local-command-stdout');
+    if (out === null || !(st.awaitContextOut || out.includes('Context Usage'))) return false;
+    st.awaitContextOut = false;
+    const snapshot = parseContextOutput(out);
+    if (snapshot) st.context = { ...st.context, snapshot, snapshotAt: timeOf(rec), snapshotModel: snapshot.model ?? st.context.model };
+    return true;
   };
 
   // Task субагента: по цепочке parentUuid, иначе — последний запущенный
@@ -263,13 +290,7 @@ function parseLines(lines: string[], st: ParseState): { changed: ChatItem[]; bad
     const sidechain = rec.isSidechain === true;
 
     if (rec.type === 'system' && rec.subtype === 'local_command' && typeof rec.content === 'string') {
-      // вывод /context (даже без своей команды рядом) — замер для панели, не в ленту
-      if (rec.content.includes('Context Usage')) {
-        const snapshot = parseContextOutput(rec.content.replace(/<\/?local-command-stdout>/g, ''));
-        const at = typeof rec.timestamp === 'string' ? Date.parse(rec.timestamp) : NaN;
-        if (snapshot) st.context = { ...st.context, snapshot, snapshotAt: Number.isFinite(at) ? at : Date.now(), snapshotModel: st.context.model };
-        continue;
-      }
+      if (contextRecord(rec.content, rec)) continue;
       const sp = special(id, rec.content);
       if (sp && sp !== 'skip') put(sp);
       continue;
@@ -279,7 +300,7 @@ function parseLines(lines: string[], st: ParseState): { changed: ChatItem[]; bad
     // Сводка сжатия контекста («This session is being continued…») и прочее только для журнала — не реплики
     if (rec.isCompactSummary === true || rec.isVisibleInTranscriptOnly === true) {
       // после сжатия сколько занято — неизвестно до следующего ответа
-      if (rec.isCompactSummary === true) st.context = { ...st.context, used: null };
+      if (rec.isCompactSummary === true) st.context = { ...st.context, used: null, usedAt: timeOf(rec) };
       continue;
     }
     // Уведомления фоновых задач Claude Code (<task-notification>) — служебные, не реплики
@@ -296,6 +317,7 @@ function parseLines(lines: string[], st: ParseState): { changed: ChatItem[]; bad
           else ownerOf(rec);
           continue;
         }
+        if (contextRecord(content, rec)) continue;
         const sp = special(id, content);
         if (sp === 'skip') continue;
         if (sp) {
@@ -317,6 +339,7 @@ function parseLines(lines: string[], st: ParseState): { changed: ChatItem[]; bad
       const images = blocks.filter((b) => b.type === 'image').map(imageOf);
       if (texts.length === 0 && images.length === 0) continue;
       const joined = texts.join('\n');
+      if (contextRecord(joined, rec)) continue;
       const sp = special(id, joined);
       if (sp === 'skip') continue;
       if (sp) {
@@ -330,7 +353,7 @@ function parseLines(lines: string[], st: ParseState): { changed: ChatItem[]; bad
 
     // assistant
     const used = usedFromAssistant(rec);
-    if (used) st.context = { ...st.context, ...used };
+    if (used) st.context = { ...st.context, ...used, usedAt: timeOf(rec) };
     if (!Array.isArray(content)) continue;
     const owner = sidechain ? ownerOf(rec) : undefined;
     (content as Block[]).forEach((b, i) => {

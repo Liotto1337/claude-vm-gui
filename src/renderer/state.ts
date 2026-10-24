@@ -56,7 +56,7 @@ export interface ChatState {
   /** Контекст сессии (значок и панель «Контекст») */
   context: SessionContext;
 }
-const EMPTY_CONTEXT: SessionContext = { used: null, model: null, snapshot: null, snapshotAt: null, snapshotModel: null };
+const EMPTY_CONTEXT: SessionContext = { used: null, usedAt: null, model: null, snapshot: null, snapshotAt: null, snapshotModel: null };
 const EMPTY_CHAT: ChatState = { items: [], pending: [], typing: {}, hasEarlier: false, screen: null, busy: false, unavailable: null, answers: [], menuAnchor: null, context: EMPTY_CONTEXT };
 
 let state: AppState = {
@@ -181,7 +181,7 @@ export async function init(): Promise<void> {
       const items = mergeItems(c.items, e);
       const typing = nextTyping(c.typing, c.items, e, performance.now());
       const context = e.context ?? c.context;
-      if (context.snapshot && context.snapshotModel) rememberWindow(context.snapshotModel, context.snapshot);
+      if (context.snapshot && context.snapshotModel && context.snapshotAt !== c.context.snapshotAt) rememberWindow(context.snapshotModel, context.snapshot);
       return { items, typing, pending: claimPending(c.pending, items, Date.now(), c.busy), hasEarlier: e.hasEarlier, unavailable: null, context };
     }),
   );

@@ -19,7 +19,7 @@ describe('viewMode', () => {
 
 describe('mergeItems', () => {
   const u = (id: string, text = id): ChatItem => ({ kind: 'user', id, text, images: [], files: [] });
-  const ev = (items: ChatItem[], patch: Partial<ChatEvent> = {}): ChatEvent => ({ session: 's', reset: false, prepend: false, items, hasEarlier: false, context: { used: null, model: null, snapshot: null, snapshotAt: null, snapshotModel: null }, ...patch });
+  const ev = (items: ChatItem[], patch: Partial<ChatEvent> = {}): ChatEvent => ({ session: 's', reset: false, prepend: false, items, hasEarlier: false, context: { used: null, usedAt: null, model: null, snapshot: null, snapshotAt: null, snapshotModel: null }, ...patch });
   it('upsert по id: обновление на месте, новые в конец', () =>
     expect(mergeItems([u('a'), u('b')], ev([u('a', 'A'), u('c')]))).toEqual([u('a', 'A'), u('b'), u('c')]));
   it('prepend: новые в начало, существующие обновляются на месте', () =>
