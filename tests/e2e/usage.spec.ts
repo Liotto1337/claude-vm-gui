@@ -17,7 +17,7 @@ test('расход Claude внизу сайдбара: токены за сег�
   try {
     const box = page.getByRole('region', { name: 'Расход Claude' });
     // 2 × (1000 + 10 000) + 500 + 1500 = 24 000
-    await expect(box.getByText('Сегодня: 24 тыс. токенов')).toBeVisible({ timeout: 30_000 });
+    await expect(box.getByText('Сегодня: 24k токенов')).toBeVisible({ timeout: 30_000 });
     // Без подписки (нет .credentials.json) — только токены
     await expect(box.getByRole('progressbar')).toHaveCount(0);
     const now = Date.now();
@@ -31,7 +31,7 @@ test('расход Claude внизу сайдбара: токены за сег�
     await expect(box.getByRole('progressbar', { name: 'Неделя' })).toHaveAttribute('aria-valuenow', '91');
     await expect(box.getByRole('progressbar', { name: 'Неделя' })).toHaveClass(/bar-danger/);
     await expect(box).toContainText('28 % · сброс в ');
-    await expect(box.getByText('Сегодня: 2,1 млн токенов')).toBeVisible();
+    await expect(box.getByText('Сегодня: 2.1M токенов')).toBeVisible();
   } finally {
     await app.close();
   }

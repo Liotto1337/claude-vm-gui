@@ -1,0 +1,28 @@
+ [1mContext Usage[22m
+[37m⛀ ⛁ ⛁ ⛀ [36m⛀ [32m⛀ [31m⛀ [93m⛁ ⛁ [35m⛀ [37m[2m⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ [22m[39m  Sonnet 5.5
+[37m[2m⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ [22m[39m  [37m[2mclaude-sonnet-5-5[22m[39m
+[37m[2m⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ [22m[39m  [37m[2m29.7k/1m tokens (3%)[22m[39m
+[37m[2m⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ [22m[39m
+[37m[2m⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ [22m[39m  [37m[2mEstimated usage by category[22m[39m
+[37m[2m⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ [22m[39m  [37m⛁[39m System prompt: [37m[2m2.8k tokens (0.3%)[22m[39m
+[37m[2m⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ [22m[39m  [37m⛁[39m System tools: [37m[2m13.4k tokens (1.3%)[22m[39m
+[37m[2m⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ [22m[39m  [36m⛁[39m MCP tools: [37m[2m671 tokens (0.1%)[22m[39m
+[37m[2m⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ [22m[39m  [32m⛁[39m MCP server instructions: [37m[2m717 tokens (0.1%)[22m[39m
+[37m[2m⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ [22m⛝ ⛝ ⛝ ⛝ ⛝ ⛝ ⛝ [39m  [31m⛁[39m Memory files: [37m[2m764 tokens (0.1%)[22m[39m
+                                          [93m⛁[39m Skills: [37m[2m9.9k tokens (1.0%)[22m[39m
+                                          [35m⛁[39m Messages: [37m[2m1.3k tokens (0.1%)[22m[39m
+                                          [37m[2m⛶[22m[39m Free space: [37m[2m937.4k (93.7%)[22m[39m
+                                          [37m⛝[2m Autocompact buffer: 33k tokens (3.3%)[22m[39m
+
+[1mAuto-compact window: [22m[37m[2m1m tokens[22m[39m
+
+[1mMCP tools[22m[37m[2m · /mcp (loaded on-demand)[22m[39m
+[37m[2m└[22m[39m [37m[2m8 tools · 671 tokens[22m[39m
+
+[1mMemory files[22m[37m[2m · /memory[22m[39m
+[37m[2m└[22m[39m [37m[2m2 files · 764 tokens[22m[39m
+
+[1mSkills[22m[37m[2m · /skills[22m[39m
+[37m[2m└[22m[39m [37m[2m74 skills · 9.9k tokens[22m[39m
+
+[37m[2m/context all to expand[22m[39m

@@ -80,13 +80,18 @@ export function parseUsage(out: string, now: number, prev: UsageSample | null = 
   return { t: now, limits, tokens, error: limits || tokens ? null : 'нет данных' };
 }
 
-const short = (v: number) => v.toLocaleString('ru-RU', { maximumFractionDigits: 1 });
+const short = (v: number) => String(Math.round(v * 10) / 10);
+const UNITS: [number, string][] = [[1e9, 'B'], [1e6, 'M'], [1e3, 'k']];
 
-/** 850 · 12,3 тыс. · 2,1 млн · 1 млрд */
+/** 850 · 12.3k · 2.1M · 1B */
 export function formatTokens(n: number): string {
-  if (n >= 1e9) return `${short(n / 1e9)} млрд`;
-  if (n >= 1e6) return `${short(n / 1e6)} млн`;
-  if (n >= 1e3) return `${short(n / 1e3)} тыс.`;
+  for (const [i, [size, unit]] of UNITS.entries()) {
+    if (n < size) continue;
+    const v = Math.round((n / size) * 10) / 10;
+    // 999 960 → «1000k» некрасиво — переходим на следующую единицу
+    if (v >= 1000 && i > 0) return `${short(v / 1000)}${UNITS[i - 1][1]}`;
+    return `${short(v)}${unit}`;
+  }
   return String(Math.round(n));
 }
 

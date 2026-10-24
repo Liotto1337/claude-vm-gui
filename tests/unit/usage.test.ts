@@ -42,9 +42,13 @@ describe('parseUsage', () => {
 describe('форматирование', () => {
   it('токены: тысячи и миллионы', () => {
     expect(formatTokens(850)).toBe('850');
-    expect(formatTokens(12_345)).toBe('12,3 тыс.');
-    expect(formatTokens(2_053_400)).toBe('2,1 млн');
-    expect(formatTokens(1_000_000_000)).toBe('1 млрд');
+    expect(formatTokens(12_345)).toBe('12.3k');
+    expect(formatTokens(832_300)).toBe('832.3k');
+    expect(formatTokens(33_000)).toBe('33k');
+    expect(formatTokens(1_000_000)).toBe('1M');
+    expect(formatTokens(999_960)).toBe('1M');
+    expect(formatTokens(2_053_400)).toBe('2.1M');
+    expect(formatTokens(1_000_000_000)).toBe('1B');
   });
   it('сброс: сегодня — время, другой день — день недели и время', () => {
     const now = new Date(2026, 9, 24, 12, 0).getTime();
