@@ -8,10 +8,7 @@ import { useAppState } from '../state';
 import { terminalTheme } from '../terminal-theme';
 import { CompactDialog } from './CompactDialog';
 
-const REFRESH_MS = 10_000;
 const WAIT_MS = 15_000;
-/** Когда /context уходил в сессию последний раз (между перемонтированиями шапки) */
-const lastSent = new Map<string, number>();
 
 const ANSI = ['black', 'red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'white'] as const;
 /** Цвет категории — палитра терминала текущей темы, как значки в выводе /context */
@@ -65,18 +62,22 @@ export function ContextBadge({ session }: { session: TmuxSession }) {
 
   const toggle = () => {
     if (open) return setOpen(false);
-    const now = Date.now();
     setOpen(true);
     setFresh(false);
     setError(null);
-    if (free && now - (lastSent.get(session.name) ?? 0) >= REFRESH_MS) {
-      lastSent.set(session.name, now);
-      sentOver.current = ctx.snapshotAt;
-      setWaitingFrom(now);
-      void api.term.send('/context', [], session.name).then((r) => {
-        if (!r.ok) setWaitingFrom(null);
-      });
-    }
+  };
+
+  /** /context — только по кнопке: его вывод остаётся в контексте сессии и занимает ~2k токенов */
+  const refresh = () => {
+    sentOver.current = ctx.snapshotAt;
+    setWaitingFrom(Date.now());
+    setError(null);
+    void api.term.send('/context', [], session.name).then((r) => {
+      if (!r.ok) {
+        setWaitingFrom(null);
+        setError(r.error.message);
+      }
+    });
   };
 
   const label = view.pct !== null ? `Контекст ${view.pct} %` : view.used !== null ? `Контекст ${formatTokens(view.used)}` : 'Контекст —';
@@ -121,7 +122,18 @@ export function ContextBadge({ session }: { session: TmuxSession }) {
               ))}
             </ul>
           ) : null}
-          {note ? <div className="caption">{note}</div> : null}
+          <div className="context-foot">
+            <span className="caption">{note ?? ''}</span>
+            <button
+              type="button"
+              className="btn btn-sm"
+              disabled={!free || waitingFrom !== null}
+              title={free ? undefined : 'Дождитесь окончания ответа'}
+              onClick={refresh}
+            >
+              Обновить разбивку
+            </button>
+          </div>
           {error ? <div className="form-error">{error}</div> : null}
           <div className="context-foot">
             <span className="caption">{view.toAutocompact !== null ? `Токенов до автосжатия: ${formatTokens(view.toAutocompact)}` : ''}</span>
