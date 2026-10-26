@@ -3,20 +3,18 @@ import { IconChevron } from './icons';
 
 const KEY_PAUSE_MS = 600;
 
+type Props = { levels: string[]; value?: string; onCommit: (level: string) => void };
+
 /**
- * Effort у поля ввода: кнопка с текущим уровнем, по нажатию — панель с ползунком, делениями и подписями.
- * /effort уходит, когда выбор закончен: мышь или палец отпустили (pointerup, change), со стрелками клавиатуры —
- * после паузы, одной командой; нажатие на подпись — сразу этот уровень. Уровень, который уже отправлен, повторно
- * не отправляется. Неизвестный текущий уровень — бегунок посередине, на кнопке «Effort», и даже отпускание
- * на том же месте выбирает его. Панель закрывается вторым нажатием на кнопку, Esc и нажатием вне.
- * phone — панель по ширине поля ввода, подписи — в зоне касания.
+ * Шкала effort: подписи уровней над делениями и ползунок. /effort уходит, когда выбор закончен: мышь или палец
+ * отпустили (pointerup, change), со стрелками клавиатуры — после паузы, одной командой; нажатие на подпись —
+ * сразу этот уровень. Уровень, который уже отправлен, повторно не отправляется. Неизвестный текущий уровень —
+ * бегунок посередине, и даже отпускание на том же месте выбирает его.
  */
-export function EffortButton({ levels, value, onCommit, phone = false }: { levels: string[]; value?: string; onCommit: (level: string) => void; phone?: boolean }) {
+export function EffortScale({ levels, value, onCommit }: Props) {
   const known = value !== undefined && levels.includes(value);
   const [at, setAt] = useState(known ? levels.indexOf(value!) : Math.floor((levels.length - 1) / 2));
   const [moved, setMoved] = useState(known);
-  const [open, setOpen] = useState(false);
-  const root = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
   const sent = useRef<string | null>(known ? value! : null);
   const keyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -60,6 +58,72 @@ export function EffortButton({ levels, value, onCommit, phone = false }: { level
     if (keyTimer.current) clearTimeout(keyTimer.current);
   }, []);
 
+  const pos = (i: number) => `${levels.length > 1 ? (i / (levels.length - 1)) * 100 : 50}%`;
+
+  return (
+    <div className="effort-scale">
+      <div className="effort-labels">
+        {levels.map((l, i) => (
+          <button
+            key={l}
+            type="button"
+            className={l === current ? 'effort-label is-on' : 'effort-label'}
+            aria-pressed={l === current}
+            style={{ left: pos(i) }}
+            onClick={() => choose(i)}
+          >
+            {l}
+          </button>
+        ))}
+      </div>
+      <div className="effort-ticks" aria-hidden="true">
+        {levels.map((l, i) => (
+          <span key={l} className="effort-tick" style={{ left: pos(i) }} />
+        ))}
+      </div>
+      <input
+        ref={input}
+        type="range"
+        aria-label="Effort"
+        aria-valuetext={current ?? 'не выбран'}
+        min={0}
+        max={levels.length - 1}
+        step={1}
+        value={idx}
+        onChange={(e) => {
+          setAt(Number(e.target.value));
+          setMoved(true);
+        }}
+        onPointerDown={() => {
+          fromKeys.current = false;
+        }}
+        onPointerUp={send}
+        onKeyDown={() => {
+          fromKeys.current = true;
+        }}
+        onKeyUp={() => {
+          if (keyTimer.current) clearTimeout(keyTimer.current);
+          keyTimer.current = setTimeout(send, KEY_PAUSE_MS);
+        }}
+        onBlur={() => {
+          if (keyTimer.current) clearTimeout(keyTimer.current);
+          if (fromKeys.current) send();
+          fromKeys.current = false;
+        }}
+      />
+    </div>
+  );
+}
+
+/**
+ * Effort у поля ввода: кнопка с текущим уровнем («Effort», пока неизвестен), по нажатию — панель со шкалой.
+ * Панель закрывается вторым нажатием на кнопку, Esc и нажатием вне.
+ */
+export function EffortButton({ levels, value, onCommit }: Props) {
+  const [open, setOpen] = useState(false);
+  const root = useRef<HTMLDivElement>(null);
+  const current = value !== undefined && levels.includes(value) ? value : null;
+
   useEffect(() => {
     if (!open) return;
     const close = (e: MouseEvent) => {
@@ -68,8 +132,6 @@ export function EffortButton({ levels, value, onCommit, phone = false }: { level
     document.addEventListener('mousedown', close);
     return () => document.removeEventListener('mousedown', close);
   }, [open]);
-
-  const pos = (i: number) => `${levels.length > 1 ? (i / (levels.length - 1)) * 100 : 50}%`;
 
   return (
     <div className="choice" ref={root} onKeyDown={(e) => e.key === 'Escape' && setOpen(false)}>
@@ -86,59 +148,9 @@ export function EffortButton({ levels, value, onCommit, phone = false }: { level
         <IconChevron />
       </button>
       {open ? (
-        <div role="dialog" aria-label="Effort" className={`popup choice-menu effort-panel${phone ? ' is-phone' : ''}`}>
+        <div role="dialog" aria-label="Effort" className="popup choice-menu effort-panel">
           <div className="caption choice-title">Effort · отправит /effort</div>
-          <div className="effort-scale">
-            <div className="effort-labels">
-              {levels.map((l, i) => (
-                <button
-                  key={l}
-                  type="button"
-                  className={l === current ? 'effort-label is-on' : 'effort-label'}
-                  aria-pressed={l === current}
-                  style={{ left: pos(i) }}
-                  onClick={() => choose(i)}
-                >
-                  {l}
-                </button>
-              ))}
-            </div>
-            <div className="effort-ticks" aria-hidden="true">
-              {levels.map((l, i) => (
-                <span key={l} className="effort-tick" style={{ left: pos(i) }} />
-              ))}
-            </div>
-            <input
-              ref={input}
-              type="range"
-              aria-label="Effort"
-              aria-valuetext={current ?? 'не выбран'}
-              min={0}
-              max={levels.length - 1}
-              step={1}
-              value={idx}
-              onChange={(e) => {
-                setAt(Number(e.target.value));
-                setMoved(true);
-              }}
-              onPointerDown={() => {
-                fromKeys.current = false;
-              }}
-              onPointerUp={send}
-              onKeyDown={() => {
-                fromKeys.current = true;
-              }}
-              onKeyUp={() => {
-                if (keyTimer.current) clearTimeout(keyTimer.current);
-                keyTimer.current = setTimeout(send, KEY_PAUSE_MS);
-              }}
-              onBlur={() => {
-                if (keyTimer.current) clearTimeout(keyTimer.current);
-                if (fromKeys.current) send();
-                fromKeys.current = false;
-              }}
-            />
-          </div>
+          <EffortScale levels={levels} value={value} onCommit={onCommit} />
         </div>
       ) : null}
     </div>
