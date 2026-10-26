@@ -3,6 +3,7 @@
 export type Result<T> = { ok: true; data: T } | { ok: false; error: { code: ErrorCode; message: string } };
 
 export type ErrorCode =
+  | 'DOWNLOAD_FAILED'
   | 'TCP_UNREACHABLE'
   | 'AUTH_FAILED'
   | 'HOSTKEY_MISMATCH'
