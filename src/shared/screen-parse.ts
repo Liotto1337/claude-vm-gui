@@ -278,6 +278,66 @@ export function submitKeysFor(menu: ParsedMenu): MenuKey[] {
   return i < 0 ? [] : [...moveKeysFor(menu, i), 'enter'];
 }
 
+/** Выбор в карточке меню, собранный локально: курсор, желаемые отметки (множественный), свой ответ. */
+export interface MenuChoice {
+  cursor: number;
+  checked: boolean[];
+  own: string;
+}
+
+/** Выбор, как он сейчас на экране Claude Code. */
+export const menuChoiceFrom = (menu: ParsedMenu): MenuChoice => ({
+  cursor: Math.max(0, menu.options.findIndex((o) => o.selected)),
+  checked: menu.options.map((o) => !!o.checked),
+  own: '',
+});
+
+/**
+ * Клавиши от экрана к выбору одной пачкой. Одиночный: цифра варианта (без своего ответа) или стрелки и Enter.
+ * Множественный: от курсора на экране — стрелки и пробел у каждого варианта, чья отметка отличается, затем Submit и Enter.
+ * Свой ответ: keys — до ввода текста, ownText — текст, after — после него.
+ */
+export function answerKeysFor(menu: ParsedMenu, choice: MenuChoice): { keys: MenuKey[]; ownText: string | null; after: MenuKey[] } {
+  const own = choice.own.trim();
+  let pos = Math.max(0, menu.options.findIndex((o) => o.selected));
+  const keys: MenuKey[] = [];
+  const after: MenuKey[] = [];
+  let ownText: string | null = null;
+  const out = () => (ownText === null ? keys : after);
+  const go = (i: number) => {
+    const d = i - pos;
+    for (let k = 0; k < Math.abs(d); k++) out().push(d > 0 ? 'down' : 'up');
+    pos = i;
+  };
+  if (menu.kind !== 'multi') {
+    const opt = menu.options[choice.cursor];
+    if (!opt) return { keys, ownText, after };
+    if (opt.input && own) {
+      go(choice.cursor);
+      ownText = own;
+    } else if (opt.n !== null && opt.n >= 1 && opt.n <= 9) return { keys: [String(opt.n) as MenuKey], ownText: null, after: [] };
+    else go(choice.cursor);
+    out().push('enter');
+    return { keys, ownText, after };
+  }
+  menu.options.forEach((o, i) => {
+    if (o.submit) return;
+    if (o.input && own) {
+      go(i);
+      ownText = own;
+    } else if (o.checked !== undefined && !!choice.checked[i] !== !!o.checked) {
+      go(i);
+      out().push('space');
+    }
+  });
+  const submit = menu.options.findIndex((o) => o.submit);
+  if (submit >= 0) {
+    go(submit);
+    out().push('enter');
+  }
+  return { keys, ownText, after };
+}
+
 /** Клавиши для выбора варианта index: цифра, если у варианта есть номер, иначе стрелки от выбранного и Enter. */
 export function menuKeysFor(menu: ParsedMenu, index: number): MenuKey[] {
   const opt = menu.options[index];

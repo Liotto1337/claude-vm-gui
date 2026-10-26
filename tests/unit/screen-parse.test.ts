@@ -2,7 +2,8 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { dialogOpen } from '../../src/shared/dialog';
-import { classifyScreen, inputText, menuKeysFor, parseMenu, parseStatus, stripAnsi, submitKeysFor, toggleKeysFor } from '../../src/shared/screen-parse';
+import type { MenuOption, ParsedMenu } from '../../src/shared/ipc';
+import { answerKeysFor, classifyScreen, inputText, menuChoiceFrom, menuKeysFor, parseMenu, parseStatus, stripAnsi, submitKeysFor, toggleKeysFor } from '../../src/shared/screen-parse';
 
 // Снимки настоящего Claude Code 2.1.303 (scripts/dev/capture-screen.sh)
 const fx = (n: string) => readFileSync(join(__dirname, '../fixtures/screens', `${n}.ans`), 'utf8');
@@ -195,5 +196,43 @@ describe('меню Claude Code 2.1.308: множественный выбор, �
       const m = pm(n);
       expect([m.kind, m.tabs, m.axis]).toEqual(['single', null, null]);
     }
+  });
+});
+
+describe('answerKeysFor: клавиши от экрана к выбору', () => {
+  const opt = (label: string, extra: Partial<MenuOption> = {}): MenuOption => ({ n: null, label, description: '', selected: false, ...extra });
+  const menu = (options: MenuOption[], kind: 'single' | 'multi' = 'single'): ParsedMenu => ({
+    title: 'Вопрос', context: [], code: [], options, notes: [], hint: null, kind, tabs: null, axis: null,
+  });
+  const fxMenu = (n: string) => parseMenu(stripAnsi(fx(n)))!;
+
+  it('радио с номерами — цифра', () => {
+    const m = menu([opt('А', { n: 1, selected: true }), opt('Б', { n: 2 }), opt('В', { n: 3 })]);
+    expect(answerKeysFor(m, { ...menuChoiceFrom(m), cursor: 2 })).toEqual({ keys: ['3'], ownText: null, after: [] });
+  });
+  it('радио без номеров — стрелки от экрана и Enter', () => {
+    const m = menu([opt('А'), opt('Б', { selected: true }), opt('В'), opt('Г')]);
+    expect(answerKeysFor(m, { ...menuChoiceFrom(m), cursor: 3 }).keys).toEqual(['down', 'down', 'enter']);
+  });
+  it('радио: свой ответ — ход, текст, затем Enter', () => {
+    const m = menu([opt('А', { n: 1, selected: true }), opt('Type something', { n: 2, input: true })]);
+    expect(answerKeysFor(m, { ...menuChoiceFrom(m), cursor: 1, own: 'синий' })).toEqual({ keys: ['down'], ownText: 'синий', after: ['enter'] });
+  });
+  it('menuChoiceFrom повторяет экран', () => {
+    expect(menuChoiceFrom(fxMenu('ask-multi-checked'))).toEqual({ cursor: 1, checked: [true, true, false, false, false, false], own: '' });
+  });
+  it('чекбоксы: снять и отметить от курсора не на первом, затем Submit', () => {
+    const m = fxMenu('ask-multi-checked'); // [✔ ✔ _ _], курсор на 1, Submit — 4
+    const c = { ...menuChoiceFrom(m), checked: [false, true, true, false, false, false] };
+    expect(answerKeysFor(m, c).keys).toEqual(['up', 'space', 'down', 'down', 'space', 'down', 'down', 'enter']);
+  });
+  it('чекбоксы без изменений — только Submit', () => {
+    const m = fxMenu('ask-multi-checked');
+    expect(answerKeysFor(m, menuChoiceFrom(m)).keys).toEqual(['down', 'down', 'down', 'enter']);
+  });
+  it('чекбоксы: свой ответ — ход к полю, текст, потом Submit', () => {
+    const m = fxMenu('ask-multi'); // курсор 0, свой ответ — 3, Submit — 4
+    const c = { ...menuChoiceFrom(m), checked: [true, false, false, false, false, false], own: 'синий' };
+    expect(answerKeysFor(m, c)).toEqual({ keys: ['space', 'down', 'down', 'down'], ownText: 'синий', after: ['down', 'enter'] });
   });
 });
