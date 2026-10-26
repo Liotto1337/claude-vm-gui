@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { dialogOpen } from '../../src/shared/dialog';
 import type { MenuOption, ParsedMenu } from '../../src/shared/ipc';
-import { answerKeysFor, classifyScreen, inputText, menuChoiceFrom, menuKeysFor, parseMenu, parseStatus, stripAnsi, submitKeysFor, toggleKeysFor } from '../../src/shared/screen-parse';
+import { answerKeysFor, classifyScreen, menuSignature, inputText, menuChoiceFrom, menuKeysFor, parseMenu, parseStatus, stripAnsi, submitKeysFor, toggleKeysFor } from '../../src/shared/screen-parse';
 
 // Снимки настоящего Claude Code 2.1.303 (scripts/dev/capture-screen.sh)
 const fx = (n: string) => readFileSync(join(__dirname, '../fixtures/screens', `${n}.ans`), 'utf8');
@@ -234,5 +234,15 @@ describe('answerKeysFor: клавиши от экрана к выбору', () =
     const m = fxMenu('ask-multi'); // курсор 0, свой ответ — 3, Submit — 4
     const c = { ...menuChoiceFrom(m), checked: [true, false, false, false, false, false], own: 'синий' };
     expect(answerKeysFor(m, c)).toEqual({ keys: ['space', 'down', 'down', 'down'], ownText: 'синий', after: ['down', 'enter'] });
+  });
+});
+
+describe('menuSignature: то же меню или новое', () => {
+  const base = { title: 'Bash command', context: ['ls'], code: [true], options: [{ n: 1, label: 'Yes', description: '', selected: true }], notes: [], hint: null, kind: 'single' as const, tabs: null, axis: null };
+  it('другая команда при тех же вариантах — новое меню', () => {
+    expect(menuSignature(base)).not.toBe(menuSignature({ ...base, context: ['rm -rf build'] }));
+  });
+  it('курсор и отметки подпись не меняют', () => {
+    expect(menuSignature(base)).toBe(menuSignature({ ...base, options: [{ ...base.options[0], selected: false }] }));
   });
 });

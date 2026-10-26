@@ -5,18 +5,28 @@ export const UPLOAD_DIR_MARK = '/claude-vm-gui/uploads/';
 /** Часть пути, по которой разбор журнала узнаёт файлы, которые Claude сделал для пользователя */
 export const OUTBOX_DIR_MARK = '/.cache/claude-vm-gui/outbox/';
 
+const isOutboxFile = (p: string) => {
+  const at = p.indexOf(OUTBOX_DIR_MARK);
+  return p.startsWith('/') && at >= 0 && p.length > at + OUTBOX_DIR_MARK.length && !p.endsWith('/');
+};
+/** Пути без пробелов: граница — пробел, кавычки, скобки; пунктуация в конце отбрасывается */
+const plainPaths = (text: string) => text.split(/[\s`"'()<>[\]]+/).map((t) => t.replace(/[.,:;!?]+$/, ''));
+
 /**
- * Пути к файлам outbox в ответе Claude: в кавычках, скобках, markdown-ссылке, с пунктуацией в конце.
+ * Пути к файлам outbox в ответе Claude. В обратных кавычках и в адресе markdown-ссылки путь берётся целиком
+ * (имя может содержать пробелы, апострофы, скобки); иначе — до пробела, кавычки или скобки, без пунктуации в конце.
  * Без повторов, в порядке появления; сама папка (без имени файла) — не файл.
  */
 export function outboxPaths(text: string): string[] {
   if (!text.includes(OUTBOX_DIR_MARK)) return [];
   const out: string[] = [];
-  for (const raw of text.split(/[\s`"'()<>[\]]+/)) {
-    const tok = raw.replace(/[.,:;!?]+$/, '');
-    const at = tok.indexOf(OUTBOX_DIR_MARK);
-    if (!tok.startsWith('/') || at < 0 || tok.length === at + OUTBOX_DIR_MARK.length || tok.endsWith('/')) continue;
-    if (!out.includes(tok)) out.push(tok);
+  const add = (p: string) => {
+    if (isOutboxFile(p) && !out.includes(p)) out.push(p);
+  };
+  for (const m of text.matchAll(/`([^`\n]+)`|\]\(([^)\n]+(?:\([^)\n]*\)[^)\n]*)*)\)|([^`\]]+)/g)) {
+    const whole = (m[1] ?? m[2])?.trim();
+    if (whole !== undefined && isOutboxFile(whole)) add(whole);
+    else plainPaths(m[1] ?? m[2] ?? m[3]).forEach(add);
   }
   return out;
 }

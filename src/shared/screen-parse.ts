@@ -278,6 +278,10 @@ export function submitKeysFor(menu: ParsedMenu): MenuKey[] {
   return i < 0 ? [] : [...moveKeysFor(menu, i), 'enter'];
 }
 
+/** То же меню, что на экране: заголовок, команда/путь, подписи вариантов, текущий вопрос (отметки и курсор не в счёт). */
+export const menuSignature = (m: ParsedMenu): string =>
+  JSON.stringify([m.title, m.context, m.options.map((o) => o.label), m.tabs?.current ?? null]);
+
 /** Выбор в карточке меню, собранный локально: курсор, желаемые отметки (множественный), свой ответ. */
 export interface MenuChoice {
   cursor: number;

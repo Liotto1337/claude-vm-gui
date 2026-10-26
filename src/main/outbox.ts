@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto';
-import { mkdirSync, rmSync } from 'node:fs';
+import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { app, BrowserWindow, dialog, shell } from 'electron';
+import { removeQuietly } from './temp-clean';
 
 // Файлы outbox на этом компьютере: куда сохранить, где открыть HTML. В E2E (CVG_TEST_HOOKS) открытие
 // и «Показать в папке» только запоминаются, диалог сохранения заменяет папка CVG_TEST_SAVE_DIR.
@@ -40,7 +41,7 @@ export function revealLocal(path: string): void {
   shell.showItemInFolder(path);
 }
 
-/** Временные страницы удаляются при выходе. */
+/** Временные страницы удаляются при выходе и при запуске (если в прошлый раз не удалились). */
 export function cleanTemp(): void {
-  rmSync(tempRoot(), { recursive: true, force: true });
+  removeQuietly(tempRoot());
 }

@@ -49,3 +49,17 @@ describe('outboxPaths', () => {
     expect(outboxPaths(`/root/.cache/claude-vm-gui/uploads/x.png /tmp/a.png ${O}/ outbox/a.png`)).toEqual([]);
   });
 });
+
+describe('outboxPaths: пробелы, апострофы и скобки в имени', () => {
+  const O = '/root/.cache/claude-vm-gui/outbox';
+  it('путь в обратных кавычках берётся целиком', () => {
+    expect(outboxPaths(`Отчёт: \`${O}/Отчёт за май.html\`.`)).toEqual([`${O}/Отчёт за май.html`]);
+    expect(outboxPaths(`\`${O}/l'été.pdf\``)).toEqual([`${O}/l'été.pdf`]);
+  });
+  it('markdown-ссылка: адрес целиком', () => {
+    expect(outboxPaths(`[отчёт](${O}/Отчёт за май.html) и [второй](${O}/b.txt)`)).toEqual([`${O}/Отчёт за май.html`, `${O}/b.txt`]);
+  });
+  it('команда в кавычках с путём внутри — путь всё равно находится', () => {
+    expect(outboxPaths(`\`cat ${O}/a.txt\``)).toEqual([`${O}/a.txt`]);
+  });
+});

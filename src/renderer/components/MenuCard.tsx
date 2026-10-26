@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import type { MenuKey, MenuOption, ParsedMenu } from '@shared/ipc';
-import { answerKeysFor, menuChoiceFrom, moveKeysFor, type MenuChoice } from '@shared/screen-parse';
+import { answerKeysFor, menuChoiceFrom, menuSignature, moveKeysFor, type MenuChoice } from '@shared/screen-parse';
 import { api } from '../api';
 import { menuKey, menuKeys } from '../state';
 
@@ -9,9 +9,6 @@ const ACCEPT_MS = 3000;
 
 /** Клавиши, которые уходят в claude сразу: смена вопроса, отмена, ось effort */
 const DIRECT: Record<string, MenuKey> = { ArrowLeft: 'left', ArrowRight: 'right', Escape: 'esc' };
-
-/** То же меню, что на экране: заголовок, подписи вариантов, текущий вопрос (отметки и курсор не в счёт) */
-const menuSig = (m: ParsedMenu) => JSON.stringify([m.title, m.options.map((o) => o.label), m.tabs?.current ?? null]);
 
 /** Свой ответ («Type something.»): поле прямо в варианте, текст собирается локально. */
 function OwnAnswer({ value, disabled, onChange, onFocus, onSubmit }: {
@@ -57,7 +54,7 @@ export function MenuCard({ session, menu }: { session: string; menu: ParsedMenu 
   const card = useRef<HTMLDivElement>(null);
   const title = menu.title || 'Claude Code спрашивает';
   const multi = menu.kind === 'multi';
-  const sig = menuSig(menu);
+  const sig = menuSignature(menu);
   const latest = useRef(menu);
   latest.current = menu;
   const [choice, setChoice] = useState<MenuChoice>(() => menuChoiceFrom(menu));

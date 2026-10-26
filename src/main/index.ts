@@ -44,6 +44,7 @@ function createWindow(): BrowserWindow {
 }
 
 app.whenReady().then(() => {
+  cleanTemp();
   session.defaultSession.webRequest.onHeadersReceived((details, cb) => {
     cb({ responseHeaders: { ...details.responseHeaders, 'Content-Security-Policy': [CSP] } });
   });

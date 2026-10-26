@@ -103,7 +103,8 @@ export class AppController {
     );
     h.handle('outbox:open-html', (path: string) =>
       this.need(async (s): Promise<Result<void>> => {
-        if (typeof path !== 'string') return fail('BAD_PATH', 'Файл не из папки загрузок');
+        // браузером открываются только страницы: .exe или .bat из outbox shell.openPath запустил бы
+        if (typeof path !== 'string' || !/\.html?$/i.test(path)) return fail('BAD_PATH', 'Открыть в браузере можно только страницу .html');
         const dest = tempDest(basename(path));
         const r = await s.upload.download(path, dest, progress(path));
         if (!r.ok) return r;
