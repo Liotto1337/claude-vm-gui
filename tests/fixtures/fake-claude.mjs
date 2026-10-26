@@ -2,14 +2,15 @@
 // Фейковый Claude Code для тестов: рисует поле ввода как настоящий (линии «─», «❯», серая подсказка),
 // включает bracketed paste и воспроизводит баг: вставка «обрабатывается» 250 мс, всё пришедшее за это время
 // (в том числе Enter) теряется. Пишет sessions/<pid>.json и журнал, если задан CVG_CLAUDE_DIR.
-// Команды: «menu» — меню из трёх вариантов; «menu-multi» — множественный выбор (как Claude Code 2.1.308); «busy» — 3 с «работы»; «long» — длинный ответ в журнал;
+// Команды: «menu» — меню из трёх вариантов; «menu-multi» — множественный выбор (как Claude Code 2.1.308); «busy» — 3 с «работы»; «long» — длинный ответ в журнал; «outbox» — четыре файла в outbox и ответ с путями к ним;
 // «grow» — ответ, который через 300 мс дописывается той же записью (тот же uuid).
 // Ответы пишут model и usage (832 300 в контексте); «/context» — вывод настоящего Claude Code 2.1.310 в журнал;
 // «/compact [текст]» — только сводка сжатия (как настоящий: ответа с usage до следующего сообщения нет).
 // CVG_FAKE_SLOW_ACCEPT=1 — поле очищается через 1200 мс после Enter. CVG_FAKE_SEED — начальный журнал (копируется при старте).
 import { execFileSync } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { appendFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { join } from 'node:path';
 
 const PASTE_MS = 250;
@@ -121,6 +122,19 @@ function submit() {
     const head = `Начало растущего ответа. ${'Слова идут одно за другим. '.repeat(6)}`;
     record('assistant', head, id);
     setTimeout(() => record('assistant', `${head}Хвост растущего ответа.`, id), 300);
+  } else if (text.trim() === 'outbox') {
+    // Как Claude по правилу из CLAUDE.md: файлы для пользователя — в outbox, путь — в ответе
+    const dir = join(homedir(), '.cache/claude-vm-gui/outbox');
+    const tag = process.env.CVG_FAKE_OUTBOX_TAG ?? 'cvg-test';
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, `${tag}-shot.png`), Buffer.from(PNG_1PX, 'base64'));
+    writeFileSync(join(dir, `${tag}-report.html`), '<!doctype html><title>Отчёт</title><h1>Отчёт</h1>');
+    writeFileSync(join(dir, `${tag}-notes.txt`), 'Заметки: всё готово');
+    writeFileSync(join(dir, `${tag}-bundle.zip`), randomBytes(2 * 1024 * 1024));
+    record(
+      'assistant',
+      `Скриншот: ${dir}/${tag}-shot.png.\n\nОтчёт: [отчёт](${dir}/${tag}-report.html)\n\nЗаметки: \`${dir}/${tag}-notes.txt\`\n\nАрхив: ${dir}/${tag}-bundle.zip`,
+    );
   } else if (text.trim() === 'menu-multi') {
     multi = { selected: 0, checked: new Set() };
     writeSession('waiting');

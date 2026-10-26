@@ -53,6 +53,7 @@ const api: Api = {
   clipboard: { read: invoke('clipboard:read'), write: send('clipboard:write') } as Api['clipboard'],
   layout: { get: invoke('layout:get'), save: invoke('layout:save') } as Api['layout'],
   links: { open: send('links:open') } as Api['links'],
+  outbox: { save: invoke('outbox:save'), openHtml: invoke('outbox:open-html'), reveal: send('outbox:reveal'), onProgress: on('outbox:progress') } as Api['outbox'],
   metrics: { setActive: send('metrics:setActive'), onSample: on('metrics:sample'), info: invoke('metrics:info') } as Api['metrics'],
   chat: {
     onItems: on('chat:items'),

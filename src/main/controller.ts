@@ -1,5 +1,5 @@
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { fail, ok, type HostKeyPrompt, type MenuKey, type Result } from '@shared/ipc';
 import { transcriptPath } from '@shared/claude-session';
 import { plural } from '@shared/plural';
@@ -13,6 +13,7 @@ import { SshConnection } from './ssh';
 import { TerminalService } from './terminal';
 import { TmuxService } from './tmux';
 import { UploadService } from './upload';
+import { chooseSaveDest, openLocal, revealLocal, tempDest } from './outbox';
 
 interface Services {
   conn: SshConnection;
@@ -88,6 +89,30 @@ export class AppController {
     h.handle('hints:dirs', (partial: string) => this.need((s) => s.hints.dirs(partial)));
     h.handle('upload:read', (path: string, maxBytes: number) => this.need((s) => s.upload.read(path, maxBytes)));
     h.handle('upload:file', (id: string, bytes: Uint8Array, name: string) => this.need((s) => s.upload.file(id, bytes, name)));
+    // Файлы outbox: скачивание идёт в main потоком SFTP, renderer видит только прогресс
+    const progress = (path: string) => (sent: number, total: number) => this.hub.emit('outbox:progress', { path, sent, total });
+    h.handle('outbox:save', (path: string) =>
+      this.need(async (s): Promise<Result<{ savedTo: string } | null>> => {
+        if (typeof path !== 'string') return fail('BAD_PATH', 'Файл не из папки загрузок');
+        const dest = await chooseSaveDest(basename(path));
+        if (!dest) return ok(null);
+        const r = await s.upload.download(path, dest, progress(path));
+        return r.ok ? ok({ savedTo: dest }) : r;
+      }),
+    );
+    h.handle('outbox:open-html', (path: string) =>
+      this.need(async (s): Promise<Result<void>> => {
+        if (typeof path !== 'string') return fail('BAD_PATH', 'Файл не из папки загрузок');
+        const dest = tempDest(basename(path));
+        const r = await s.upload.download(path, dest, progress(path));
+        if (!r.ok) return r;
+        const err = await openLocal(dest);
+        return err ? fail('DOWNLOAD_FAILED', err) : ok(undefined);
+      }),
+    );
+    h.listen('outbox:reveal', (savedTo: unknown) => {
+      if (typeof savedTo === 'string') revealLocal(savedTo);
+    });
   }
 
   private async need<T>(fn: (s: Services) => Promise<Result<T>>): Promise<Result<T>> {

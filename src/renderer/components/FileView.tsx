@@ -4,6 +4,7 @@ import { formatBytes } from '@shared/metrics-parse';
 import { isTextName, looksBinary, TEXT_PREVIEW_BYTES } from '@shared/text-file';
 import { displayName, isImageName, MAX_FILE_BYTES } from '@shared/upload-name';
 import { api } from '../api';
+import { useAppState } from '../state';
 import { FileCache } from '../file-cache';
 import { IconChevron, IconChevronRight, IconFile, IconImage } from './icons';
 import { Lightbox } from './Lightbox';
@@ -110,4 +111,77 @@ function UploadedFile({ path, name }: { path: string; name: string }) {
 export function FileView({ path }: { path: string }) {
   const name = displayName(path);
   return isImageName(name) ? <UploadedImage path={path} name={name} /> : <UploadedFile path={path} name={name} />;
+}
+
+type SaveState = { kind: 'idle' } | { kind: 'busy'; pct: number | null } | { kind: 'saved'; to: string } | { kind: 'error'; message: string };
+
+/** «Открыть в браузере» (HTML) и «Сохранить» у файла outbox: скачивание идёт в main, здесь — прогресс и итог. */
+function OutboxActions({ path, html }: { path: string; html: boolean }) {
+  const online = useAppState().connection.state === 'connected';
+  const [save, setSave] = useState<SaveState>({ kind: 'idle' });
+  const [opening, setOpening] = useState(false);
+  const [openError, setOpenError] = useState<string | null>(null);
+  useEffect(
+    () =>
+      api.outbox.onProgress((p) => {
+        if (p.path === path) setSave((s) => (s.kind === 'busy' ? { kind: 'busy', pct: p.total ? Math.floor((p.sent / p.total) * 100) : null } : s));
+      }),
+    [path],
+  );
+  const doSave = async () => {
+    setSave({ kind: 'busy', pct: null });
+    const r = await api.outbox.save(path);
+    setSave(!r.ok ? { kind: 'error', message: r.error.message } : r.data ? { kind: 'saved', to: r.data.savedTo } : { kind: 'idle' });
+  };
+  const doOpen = async () => {
+    setOpening(true);
+    setOpenError(null);
+    const r = await api.outbox.openHtml(path);
+    setOpening(false);
+    if (!r.ok) setOpenError(r.error.message);
+  };
+  const off = online ? undefined : 'Нет подключения к ВМ';
+  return (
+    <div className="outbox-actions">
+      {html ? (
+        <button type="button" className="btn btn-sm" disabled={!online || opening} title={off} onClick={() => void doOpen()}>
+          Открыть в браузере
+        </button>
+      ) : null}
+      {save.kind === 'saved' ? (
+        <>
+          <span className="caption">Сохранено</span>
+          <button type="button" className="btn btn-sm" onClick={() => api.outbox.reveal(save.to)}>Показать в папке</button>
+        </>
+      ) : save.kind === 'busy' ? (
+        <>
+          <div className="bar bar-thin outbox-bar" role="progressbar" aria-label="Сохранение" aria-valuenow={save.pct ?? 0} aria-valuemin={0} aria-valuemax={100}>
+            <div className="bar-fill" style={{ width: `${save.pct ?? 0}%` }} />
+          </div>
+          <span className="caption">{save.pct ?? 0} %</span>
+        </>
+      ) : (
+        <button type="button" className="btn btn-sm" disabled={!online} title={off} onClick={() => void doSave()}>
+          {save.kind === 'error' ? 'Повторить' : 'Сохранить'}
+        </button>
+      )}
+      {save.kind === 'error' ? <span className="form-error">{save.message}</span> : null}
+      {openError ? <span className="form-error">{openError}</span> : null}
+    </div>
+  );
+}
+
+/**
+ * Файл, который Claude положил в outbox: картинка — целиком, текст — раскрывается, остальное — имя и размер;
+ * у всех — «Сохранить», у HTML — «Открыть в браузере».
+ */
+export function OutboxFile({ path }: { path: string }) {
+  const name = path.slice(path.lastIndexOf('/') + 1);
+  const html = /\.html?$/i.test(name);
+  return (
+    <div className="outbox-file" role="group" aria-label={name}>
+      {isImageName(name) ? <UploadedImage path={path} name={name} /> : <UploadedFile path={path} name={name} />}
+      <OutboxActions path={path} html={html} />
+    </div>
+  );
 }

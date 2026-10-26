@@ -1,6 +1,6 @@
 import { memo, useState } from 'react';
 import type { ChatItem } from '@shared/ipc';
-import { FileView, JournalImage } from './FileView';
+import { FileView, JournalImage, OutboxFile } from './FileView';
 import { IconChevron, IconChevronRight } from './icons';
 import { Markdown } from './Markdown';
 import { TypedMarkdown } from './TypedMarkdown';
@@ -76,8 +76,20 @@ export const ChatItemView = memo(function ChatItemView({ item, typingSince, onTy
           {item.text ? <span className="bubble-text">{item.text}</span> : null}
         </div>
       );
-    case 'assistant':
-      return typingSince !== undefined && onTyped ? <TypedMarkdown text={item.text} since={typingSince} onDone={onTyped} /> : <Markdown text={item.text} />;
+    case 'assistant': {
+      const text = typingSince !== undefined && onTyped ? <TypedMarkdown text={item.text} since={typingSince} onDone={onTyped} /> : <Markdown text={item.text} />;
+      if (!item.files?.length) return text;
+      return (
+        <>
+          {text}
+          <div className="outbox-files">
+            {item.files.map((f) => (
+              <OutboxFile key={f} path={f} />
+            ))}
+          </div>
+        </>
+      );
+    }
     case 'thinking':
       return <div className="thinking caption">Размышления</div>;
     case 'note':

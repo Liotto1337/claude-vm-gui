@@ -1,6 +1,7 @@
 import { app, BrowserWindow, safeStorage, session, shell } from 'electron';
 import { join } from 'node:path';
 import { AppController } from './controller';
+import { cleanTemp } from './outbox';
 import { startUpdates } from './updates';
 import { IpcHub, repoDirForDev } from './ipc';
 
@@ -61,6 +62,7 @@ app.whenReady().then(() => {
     hub.layouts.flush();
     updates.stop();
     controller.disconnect();
+    cleanTemp();
   });
   if (process.env.CVG_TEST_HOOKS === '1') {
     const g = globalThis as unknown as { __cvg?: object };
