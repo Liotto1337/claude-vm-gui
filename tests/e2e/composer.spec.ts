@@ -99,14 +99,18 @@ test('подсказки, картинка, отправка, модель и ef
     await page.getByRole('menuitemradio', { name: /^Sonnet/ }).first().click();
     await expect.poll(() => pane(name)).toContain('/model sonnet');
     await expect(page.getByRole('button', { name: /^Модель/ })).toContainText('Sonnet');
-    // Effort — ползунок: отпустили — уходит /effort
-    const effort = page.getByRole('slider', { name: 'Effort' });
+    // Effort — кнопка с уровнем, по нажатию панель с ползунком: отпустили — уходит /effort
+    const btn = page.getByRole('button', { name: /^Effort/ });
+    await expect(btn).toHaveText('Effort');
+    await btn.click();
+    const effort = page.getByRole('dialog', { name: 'Effort' }).getByRole('slider', { name: 'Effort' });
     await effort.fill('0');
     await expect.poll(() => pane(name)).toContain('/effort low');
-    await expect(page.locator('.effort-value')).toHaveText('low');
+    await expect(btn).toHaveText('low');
     await effort.focus();
     await page.keyboard.press('End');
     await expect.poll(() => pane(name)).toContain('/effort max');
+    await expect(btn).toHaveText('max');
   } finally {
     await app.close();
   }
@@ -194,8 +198,9 @@ test('прикрепить любой файл: значок и имя, путь
 test('effort ползунком: клик по середине при неизвестном уровне отправляет его, стрелки — одна команда после паузы', async () => {
   const { app, page } = await openWith(['cat'], { CVG_FAKE_CLAUDE: '1' });
   try {
-    const effort = page.getByRole('slider', { name: 'Effort' });
-    await expect(page.locator('.effort-value')).toHaveText('—');
+    await page.getByRole('button', { name: /^Effort/ }).click();
+    const effort = page.getByRole('dialog', { name: 'Effort' }).getByRole('slider', { name: 'Effort' });
+    await expect(effort).toHaveAttribute('aria-valuetext', 'не выбран');
     // Бегунок уже на середине: клик туда не меняет значения (нет change), но выбор должен уйти
     await effort.click();
     await expect.poll(() => pane(name), { timeout: 10_000 }).toMatch(/\/effort \w+/);
@@ -209,6 +214,46 @@ test('effort ползунком: клик по середине при неиз�
     await expect.poll(count, { timeout: 10_000 }).toBe(before + 1);
     await page.waitForTimeout(1500);
     expect(count()).toBe(before + 1);
+  } finally {
+    await app.close();
+  }
+});
+
+test('effort: панель с делениями и подписями, подпись выбирает уровень, второе нажатие закрывает', async () => {
+  const { app, page } = await openWith(['cat'], { CVG_FAKE_CLAUDE: '1' });
+  try {
+    const btn = page.getByRole('button', { name: /^Effort/ });
+    await expect(btn).toHaveAttribute('aria-label', 'Effort');
+    await expect(btn).toHaveAttribute('title', 'Effort · отправит /effort');
+    await btn.click();
+    const panel = page.getByRole('dialog', { name: 'Effort' });
+    await expect(panel).toBeVisible();
+    const labels = panel.getByRole('button');
+    await expect(labels).toHaveText(['low', 'medium', 'high', 'xhigh', 'max']);
+    // подпись стоит над своим делением
+    const ticks = panel.locator('.effort-tick');
+    await expect(ticks).toHaveCount(5);
+    for (const i of [0, 2, 4]) {
+      const l = (await labels.nth(i).boundingBox())!;
+      const t = (await ticks.nth(i).boundingBox())!;
+      expect(Math.abs(l.x + l.width / 2 - (t.x + t.width / 2))).toBeLessThanOrEqual(4);
+      expect(l.y).toBeLessThan(t.y);
+    }
+    await panel.getByRole('button', { name: 'high', exact: true }).click();
+    await expect.poll(() => pane(name), { timeout: 10_000 }).toContain('/effort high');
+    await expect(btn).toHaveText('high');
+    await expect(btn).toHaveAttribute('aria-label', 'Effort: high');
+    await expect(panel).toBeVisible();
+    await expect(panel.getByRole('button', { name: 'high', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    // второе нажатие закрывает; Esc и клик вне — тоже
+    await btn.click();
+    await expect(panel).toBeHidden();
+    await btn.click();
+    await page.keyboard.press('Escape');
+    await expect(panel).toBeHidden();
+    await btn.click();
+    await page.mouse.click(10, 300);
+    await expect(panel).toBeHidden();
   } finally {
     await app.close();
   }

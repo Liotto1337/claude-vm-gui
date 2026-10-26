@@ -8,7 +8,7 @@ import { revoke, type Attachment } from '../attachments';
 import { getDraft, restoreFailed, setDraft, updateDraft, useDraft } from '../drafts';
 import { AttachmentChip } from './AttachmentChip';
 import { ChoiceMenu } from './ChoiceMenu';
-import { EffortSlider } from './EffortSlider';
+import { EffortButton } from './EffortButton';
 import { HintPopup, type HintItem } from './HintPopup';
 import { IconArrowUp, IconClip } from './icons';
 
@@ -292,7 +292,7 @@ export function Composer({ session, menu = null, working = false, chatMode = fal
                 })
               }
             />
-            <EffortSlider
+            <EffortButton
               levels={efforts}
               value={choice.effort}
               onCommit={(level) =>

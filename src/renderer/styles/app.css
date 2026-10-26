@@ -317,9 +317,17 @@ button.file-row { cursor: pointer; }
 .menu-check.is-on { background: var(--btn-dark-bg); border-color: transparent; }
 .menu-check.is-on::after { content: ''; width: 5px; height: 9px; margin-top: -2px; border: solid var(--btn-dark-text); border-width: 0 2px 2px 0; transform: rotate(45deg); }
 .menu-own { flex: 1; min-width: 0; }
-.effort { display: inline-flex; align-items: center; gap: 6px; }
-.effort input[type='range'] { width: 96px; accent-color: var(--accent); }
-.effort-value { min-width: 44px; }
+.effort-panel { width: 300px; overflow: visible; }
+/* Подписи и деления — над ходом центра бегунка: поля по половине бегунка с каждой стороны */
+.effort-scale { padding: 2px 6px 6px; }
+.effort-labels, .effort-ticks { position: relative; margin: 0 8px; }
+.effort-labels { height: 30px; }
+.effort-label { position: absolute; top: 0; transform: translateX(-50%); min-height: 26px; padding: 0 6px; border: none; border-radius: 6px; background: transparent; color: var(--text-2); font: inherit; font-size: 12px; white-space: nowrap; cursor: pointer; }
+.effort-label:hover, .effort-label.is-on { background: var(--hover); color: var(--text); }
+.effort-label.is-on { font-weight: 600; }
+.effort-ticks { height: 6px; }
+.effort-tick { position: absolute; top: 0; width: 1px; height: 6px; background: var(--border-strong); transform: translateX(-50%); }
+.effort-scale input[type='range'] { display: block; width: 100%; margin: 2px 0 0; accent-color: var(--accent); }
 .menu-n { margin-right: 6px; }
 .menu-axis { display: flex; align-items: center; gap: 8px; padding: 0 4px; font-size: 13px; }
 .menu-foot { display: flex; align-items: center; gap: 12px; }
