@@ -2,6 +2,25 @@
 
 /** Часть пути, по которой разбор журнала узнаёт вложения */
 export const UPLOAD_DIR_MARK = '/claude-vm-gui/uploads/';
+/** Часть пути, по которой разбор журнала узнаёт файлы, которые Claude сделал для пользователя */
+export const OUTBOX_DIR_MARK = '/.cache/claude-vm-gui/outbox/';
+
+/**
+ * Пути к файлам outbox в ответе Claude: в кавычках, скобках, markdown-ссылке, с пунктуацией в конце.
+ * Без повторов, в порядке появления; сама папка (без имени файла) — не файл.
+ */
+export function outboxPaths(text: string): string[] {
+  if (!text.includes(OUTBOX_DIR_MARK)) return [];
+  const out: string[] = [];
+  for (const raw of text.split(/[\s`"'()<>[\]]+/)) {
+    const tok = raw.replace(/[.,:;!?]+$/, '');
+    const at = tok.indexOf(OUTBOX_DIR_MARK);
+    if (!tok.startsWith('/') || at < 0 || tok.length === at + OUTBOX_DIR_MARK.length || tok.endsWith('/')) continue;
+    if (!out.includes(tok)) out.push(tok);
+  }
+  return out;
+}
+
 export const MAX_FILE_BYTES = 50 * 1024 * 1024;
 const MAX_NAME = 80;
 

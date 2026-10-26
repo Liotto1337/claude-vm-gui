@@ -58,7 +58,7 @@ describe('временный пузырь отправленного сообщ�
 });
 
 describe('какие ответы «печатаются»', () => {
-  const a = (id: string, text = 'ответ'): ChatItem => ({ kind: 'assistant', id, text });
+  const a = (id: string, text = 'ответ'): ChatItem => ({ kind: 'assistant', id, text, files: [] });
   const ev = (items: ChatItem[], reset = false, prepend = false) => ({ items, reset, prepend });
 
   it('новый ответ — печатается с текущего момента', () => expect(nextTyping({}, [], ev([a('x')]), 5)).toEqual({ x: 5 }));

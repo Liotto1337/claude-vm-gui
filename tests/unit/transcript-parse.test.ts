@@ -275,3 +275,15 @@ describe('контекст сессии', () => {
     expect(r.changed).toMatchObject([{ kind: 'user', text: '/compact сохрани план' }]);
   });
 });
+
+describe('файлы outbox в ответе Claude', () => {
+  const answer = (text: string) =>
+    parseAll([JSON.stringify({ type: 'assistant', uuid: 'o1', message: { content: [{ type: 'text', text }] } })]).changed.find((i) => i.kind === 'assistant');
+  it('путь из outbox → files, текст не меняется', () => {
+    const text = 'Скриншот: /root/.cache/claude-vm-gui/outbox/shot.png';
+    expect(answer(text)).toMatchObject({ kind: 'assistant', text, files: ['/root/.cache/claude-vm-gui/outbox/shot.png'] });
+  });
+  it('без пути — files пустой', () => {
+    expect(answer('Готово')).toMatchObject({ files: [] });
+  });
+});

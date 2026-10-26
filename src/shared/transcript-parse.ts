@@ -1,4 +1,4 @@
-import { UPLOAD_DIR_MARK } from './upload-name';
+import { outboxPaths, UPLOAD_DIR_MARK } from './upload-name';
 import type { ChatImage, ChatItem, SessionContext } from './ipc';
 import { parseContextOutput, usedFromAssistant } from './context-parse';
 import { stripAnsi } from './screen-parse';
@@ -361,13 +361,13 @@ function parseLines(lines: string[], st: ParseState): { changed: ChatItem[]; bad
       if (sidechain) {
         if (b.type === 'text' && b.text?.trim()) {
           if (owner) {
-            owner.children = [...owner.children, { kind: 'assistant', id: `${id}:${i}`, text: b.text }];
+            owner.children = [...owner.children, { kind: 'assistant', id: `${id}:${i}`, text: b.text, files: outboxPaths(b.text) }];
             touch(owner.id);
           }
         }
         return;
       }
-      if (b.type === 'text' && b.text?.trim()) put({ kind: 'assistant', id: `${id}:${i}`, text: b.text });
+      if (b.type === 'text' && b.text?.trim()) put({ kind: 'assistant', id: `${id}:${i}`, text: b.text, files: outboxPaths(b.text) });
       else if (b.type === 'thinking' || b.type === 'redacted_thinking') put({ kind: 'thinking', id: `${id}:${i}` });
     });
   }

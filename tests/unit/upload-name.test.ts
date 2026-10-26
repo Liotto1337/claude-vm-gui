@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { displayName, isImageName, remoteName } from '../../src/shared/upload-name';
+import { displayName, isImageName, outboxPaths, remoteName } from '../../src/shared/upload-name';
 
 const D = new Date(2026, 9, 22, 13, 5, 9);
 
@@ -26,5 +26,26 @@ describe('displayName и isImageName', () => {
     expect(isImageName('a.webp')).toBe(true);
     expect(isImageName('a.svg')).toBe(false);
     expect(isImageName('png')).toBe(false);
+  });
+});
+
+describe('outboxPaths', () => {
+  const O = '/root/.cache/claude-vm-gui/outbox';
+  it('путь в конце предложения — без точки', () => {
+    expect(outboxPaths(`Скриншот: ${O}/a.png.`)).toEqual([`${O}/a.png`]);
+  });
+  it('кавычки, скобки и markdown-ссылка снимаются', () => {
+    expect(outboxPaths(`\`${O}/a.txt\` "${O}/b.txt" (${O}/c.txt) <${O}/d.txt> [отчёт](${O}/r.html)`)).toEqual([
+      `${O}/a.txt`, `${O}/b.txt`, `${O}/c.txt`, `${O}/d.txt`, `${O}/r.html`,
+    ]);
+  });
+  it('пунктуация в конце, повтор — один раз, порядок появления', () => {
+    expect(outboxPaths(`${O}/z.zip, ${O}/a.png; ${O}/z.zip! ${O}/q.pdf?`)).toEqual([`${O}/z.zip`, `${O}/a.png`, `${O}/q.pdf`]);
+  });
+  it('кириллица и вложенная папка', () => {
+    expect(outboxPaths(`Готово: ${O}/2026/отчёт.html`)).toEqual([`${O}/2026/отчёт.html`]);
+  });
+  it('чужие папки и сама папка outbox — не файлы', () => {
+    expect(outboxPaths(`/root/.cache/claude-vm-gui/uploads/x.png /tmp/a.png ${O}/ outbox/a.png`)).toEqual([]);
   });
 });

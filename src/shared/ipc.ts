@@ -119,7 +119,7 @@ export interface ChatImage { mediaType: string; data: string }
 /** Элемент ленты переписки (из журнала Claude Code). files — пути вложений из папки загрузок на ВМ. */
 export type ChatItem =
   | { kind: 'user'; id: string; text: string; images: ChatImage[]; files: string[] }
-  | { kind: 'assistant'; id: string; text: string }
+  | { kind: 'assistant'; id: string; text: string; files: string[] }
   | { kind: 'thinking'; id: string }
   | { kind: 'note'; id: string; text: string }
   | {
