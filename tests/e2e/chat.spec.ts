@@ -21,7 +21,7 @@ test.beforeEach(() => {
   const seed = join(claudeDir, 'seed.jsonl');
   const link = JSON.stringify({ type: 'assistant', uuid: 'link', message: { content: [{ type: 'text', text: 'Подробнее: [сайт](https://example.com/doc)' }] } });
   writeFileSync(seed, `${readFileSync(FIXTURE, 'utf8')}${link}\n`);
-  tmux('new-session', '-d', '-s', 'cvg-test-claude', '-x', '120', '-y', '40', `CVG_CLAUDE_DIR=${claudeDir} CVG_FAKE_SEED=${seed} node ${FAKE}`);
+  tmux('new-session', '-d', '-s', 'cvg-test-claude', '-x', '120', '-y', '40', `CVG_CLAUDE_DIR=${claudeDir} CVG_FAKE_SEED=${seed} CVG_FAKE_KEYLOG=${join(claudeDir, 'keys.log')} node ${FAKE}`);
   tmux('new-session', '-d', '-s', 'cvg-test-shell');
   // claude без файла сессии (sessions/<pid>.json не пишется) — журнал не найти
   tmux('new-session', '-d', '-s', 'cvg-test-nofile', '-x', '120', '-y', '40', `node ${FAKE}`);
@@ -43,6 +43,11 @@ async function open(session = 'cvg-test-claude', theme = 'light'): Promise<Launc
   return l;
 }
 const feed = (page: Page) => page.getByRole('region', { name: 'Переписка' });
+/** Клавиши, которые фейковый claude получил, пока было открыто меню */
+const keys = (): { k: string; t: number }[] => {
+  const f = join(claudeDir, 'keys.log');
+  return existsSync(f) ? readFileSync(f, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [];
+};
 const composer = (page: Page) => page.getByRole('textbox', { name: 'Сообщение для Claude' });
 
 test('при claude показывается лента, терминал скрыт', async () => {
@@ -98,11 +103,17 @@ test('меню: карточка, стрелка вниз и Enter выбира�
     // Номер варианта виден: подсказка обещает «цифра — сразу»
     await expect(card.getByRole('radio', { name: /Да и не спрашивать/ }).locator('.menu-n')).toHaveText('2.');
     await expect(composer(page)).toBeDisabled();
+    // выбор — только в карточке, сразу и без клавиш в claude
     await page.keyboard.press('ArrowDown');
-    await expect(card.getByRole('radio', { name: /Да и не спрашивать/ })).toHaveAttribute('aria-checked', 'true', { timeout: 5000 });
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('ArrowUp');
+    await expect(card.getByRole('radio', { name: /Да и не спрашивать/ })).toHaveAttribute('aria-checked', 'true', { timeout: 300 });
+    await page.waitForTimeout(800);
+    expect(keys()).toEqual([]);
     await page.keyboard.press('Enter');
     await expect(card).toBeHidden({ timeout: 5000 });
     await expect(feed(page).getByText('выбран 2')).toBeVisible({ timeout: 10_000 });
+    expect(keys().map((x) => x.k)).toEqual(['2']);
   } finally {
     await app.close();
   }
@@ -218,6 +229,10 @@ test('меню: клик по варианту', async () => {
     await composer(page).press('Enter');
     const card = feed(page).getByRole('group', { name: 'Выбор' });
     await card.getByRole('radio', { name: /Нет/ }).click({ timeout: 10_000 });
+    await expect(card.getByRole('radio', { name: /Нет/ })).toHaveAttribute('aria-checked', 'true', { timeout: 300 });
+    await page.waitForTimeout(800);
+    expect(keys()).toEqual([]);
+    await card.getByRole('button', { name: 'Ответить' }).click();
     await expect(feed(page).getByText('выбран 3')).toBeVisible({ timeout: 10_000 });
   } finally {
     await app.close();
@@ -458,9 +473,11 @@ test('множественный выбор в ленте: чекбоксы и �
     await expect(boxes).toHaveCount(3);
     await expect(card.getByRole('checkbox', { name: /Submit/ })).toHaveCount(0);
     await card.getByRole('checkbox', { name: /Да и не спрашивать/ }).click();
-    await expect(card.getByRole('checkbox', { name: /Да и не спрашивать/ })).toHaveAttribute('aria-checked', 'true', { timeout: 5000 });
+    await expect(card.getByRole('checkbox', { name: /Да и не спрашивать/ })).toHaveAttribute('aria-checked', 'true', { timeout: 300 });
     await card.getByRole('checkbox', { name: /Нет$/ }).click();
-    await expect(card.getByRole('checkbox', { name: /Нет$/ })).toHaveAttribute('aria-checked', 'true', { timeout: 5000 });
+    await expect(card.getByRole('checkbox', { name: /Нет$/ })).toHaveAttribute('aria-checked', 'true', { timeout: 300 });
+    await page.waitForTimeout(800);
+    expect(keys()).toEqual([]);
     await card.getByRole('button', { name: 'Готово' }).click();
     await expect(feed(page).getByText('выбраны: Да и не спрашивать, Нет')).toBeVisible({ timeout: 10_000 });
   } finally {
@@ -475,6 +492,7 @@ test('итог ответа на меню остаётся в ленте на м
     await composer(l.page).fill('menu');
     await composer(l.page).press('Enter');
     await feed(l.page).getByRole('group', { name: 'Выбор' }).getByRole('radio', { name: /Нет/ }).click({ timeout: 10_000 });
+    await feed(l.page).getByRole('group', { name: 'Выбор' }).getByRole('button', { name: 'Ответить' }).click();
     const note = feed(l.page).locator('.note', { hasText: 'Выбор → выбрано: Нет' });
     await expect(note).toBeVisible({ timeout: 10_000 });
     // После сообщения «menu» и до ответа Claude
@@ -493,5 +511,46 @@ test('итог ответа на меню остаётся в ленте на м
     await expect(feed(l.page).locator('.note', { hasText: 'Выбор → выбрано: Нет' })).toBeVisible({ timeout: 15_000 });
   } finally {
     await l.app.close();
+  }
+});
+
+test('чекбоксы: курсор не на первом, снять и отметить — одна пачка клавиш, итог как выбрано', async () => {
+  const { app, page } = await open();
+  try {
+    await expect(feed(page)).toBeVisible({ timeout: 15_000 });
+    await composer(page).fill('menu-multi5');
+    await composer(page).press('Enter');
+    const card = feed(page).getByRole('group', { name: 'Какие цвета?' });
+    await expect(card.getByRole('checkbox', { name: /Зелёный/ })).toHaveAttribute('aria-checked', 'true', { timeout: 10_000 });
+    await card.getByRole('checkbox', { name: /Зелёный/ }).click();
+    await card.getByRole('checkbox', { name: /Красный/ }).click();
+    await card.getByRole('checkbox', { name: /Белый/ }).click();
+    await page.waitForTimeout(800);
+    expect(keys()).toEqual([]);
+    await card.getByRole('button', { name: 'Готово' }).click();
+    await expect(feed(page).getByText('выбраны: Красный, Белый')).toBeVisible({ timeout: 10_000 });
+    const sent = keys();
+    expect(sent.length).toBeGreaterThan(0);
+    expect(sent[sent.length - 1].t - sent[0].t).toBeLessThan(1000);
+  } finally {
+    await app.close();
+  }
+});
+
+test('Claude Code не принял ответ — через 3 с ошибка и выбор как на экране', async () => {
+  const { app, page } = await open();
+  try {
+    await expect(feed(page)).toBeVisible({ timeout: 15_000 });
+    await composer(page).fill('menu-deaf');
+    await composer(page).press('Enter');
+    const card = feed(page).getByRole('group', { name: 'Выбор' });
+    await card.getByRole('radio', { name: /Нет/ }).click({ timeout: 10_000 });
+    await card.getByRole('button', { name: 'Ответить' }).click();
+    await expect(card).toContainText('отправляю…');
+    await expect(card).toContainText('Claude Code не принял ответ — проверьте выбор', { timeout: 6000 });
+    await expect(card.getByRole('radio', { name: /^1\. Да$|Да$/ }).first()).toHaveAttribute('aria-checked', 'true');
+    await expect(card.getByRole('radio', { name: /Нет/ })).toHaveAttribute('aria-checked', 'false');
+  } finally {
+    await app.close();
   }
 });

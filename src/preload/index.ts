@@ -61,6 +61,7 @@ const api: Api = {
     onUnavailable: on('chat:unavailable'),
     loadEarlier: invoke('chat:loadEarlier'),
     key: invoke('chat:key'),
+    keys: invoke('chat:keys'),
     typeText: invoke('chat:typeText'),
   } as Api['chat'],
   usage: { get: invoke('usage:get'), onSample: on('usage:sample') } as Api['usage'],

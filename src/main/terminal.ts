@@ -28,6 +28,8 @@ export interface TerminalOptions {
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+/** Пауза между клавишами пачки ответа на меню (проверено на Claude Code 2.1.310) */
+const KEY_GAP_MS = 0;
 
 /**
  * Терминал открытой tmux-сессии: канал `tmux attach` с PTY.
@@ -178,6 +180,31 @@ export class TerminalService extends EventEmitter {
    */
   key(k: MenuKey, session?: string): Promise<Result<void>> {
     const run = this.keyQueue.then(() => this.keyNow(k, session));
+    this.keyQueue = run.catch(() => undefined);
+    return run;
+  }
+
+  /**
+   * Пачка клавиш ответа на меню: экран проверяется один раз, клавиши пишутся подряд по одной
+   * (KEY_GAP_MS между ними), без ожидания перерисовки. Неизвестная клавиша — ничего не пишется.
+   */
+  keys(ks: MenuKey[], session?: string): Promise<Result<void>> {
+    const run = this.keyQueue.then(async (): Promise<Result<void>> => {
+      let bytes: string[];
+      try {
+        bytes = (Array.isArray(ks) ? ks : []).map((k) => keyBytes(k));
+      } catch (e) {
+        return fail('BAD_NAME', (e as Error).message);
+      }
+      if (!bytes.length) return ok(undefined);
+      const t = await this.target(session, true);
+      if (!t.ok) return t;
+      for (const [i, b] of bytes.entries()) {
+        if (i > 0 && KEY_GAP_MS > 0) await sleep(KEY_GAP_MS);
+        t.data.stream.write(b);
+      }
+      return ok(undefined);
+    });
     this.keyQueue = run.catch(() => undefined);
     return run;
   }

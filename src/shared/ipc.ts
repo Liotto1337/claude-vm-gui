@@ -262,6 +262,8 @@ export interface Api {
     onUnavailable(cb: (e: { session: string; reason: string }) => void): Unsubscribe;
     loadEarlier(): Promise<Result<void>>;
     key(k: MenuKey, session?: string): Promise<Result<void>>;
+    /** Пачка клавиш ответа на меню: экран проверяется один раз */
+    keys(ks: MenuKey[], session?: string): Promise<Result<void>>;
     /** Текст в поле своего ответа меню (без Enter) */
     typeText(text: string, session?: string): Promise<Result<void>>;
   };

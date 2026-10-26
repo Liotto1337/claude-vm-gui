@@ -305,6 +305,12 @@ export function menuKey(session: string, k: MenuKey): ReturnType<typeof api.chat
   return api.chat.key(k, session);
 }
 
+/** Пачка клавиш ответа на меню; итог меню помнит последнюю из них. */
+export function menuKeys(session: string, ks: MenuKey[]): ReturnType<typeof api.chat.keys> {
+  if (ks.length) lastMenuKey.set(session, ks[ks.length - 1]);
+  return api.chat.keys(ks, session);
+}
+
 const TERMINAL_KEYS: Record<string, MenuKey> = { '\x1b': 'esc', '\x03': 'esc', '\r': 'enter', '\x1b[A': 'up', '\x1b[B': 'down', ' ': 'space' };
 
 /** Ввод прямо в терминале приложения (режим «Терминал»): Esc и Ctrl+C тоже дают итог меню «отменено». */

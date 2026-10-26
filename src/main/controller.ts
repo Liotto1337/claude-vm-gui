@@ -81,6 +81,7 @@ export class AppController {
     h.handle('usage:get', () => this.s?.usage.latest ?? null);
     h.handle('metrics:info', () => this.need((s) => s.metrics.info()));
     h.handle('chat:key', (k: MenuKey, session?: string) => this.need((s) => s.term.key(k, optName(session))));
+    h.handle('chat:keys', (ks: MenuKey[], session?: string) => this.need((s) => s.term.keys(ks, optName(session))));
     h.handle('chat:typeText', (t: string, session?: string) => this.need((s) => s.term.typeText(t, optName(session))));
     h.handle('chat:loadEarlier', () => this.need((s) => s.transcript.loadEarlier()));
 
