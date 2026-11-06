@@ -35,3 +35,4 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           files: release/*.exe
+          prerelease: ${{ contains(github.ref_name, '-') }}

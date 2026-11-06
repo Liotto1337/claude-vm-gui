@@ -4,6 +4,7 @@ import type {
 } from '@shared/ipc';
 import { claimPending, nextTyping, type Pending } from './chat-anim';
 import { loadAnswers, nextAnswers, saveAnswers, type MenuAnswer } from './menu-history';
+import { dropMissing, loadPins, savePins, togglePin, type Pin } from './pins';
 import { mergeItems } from './view-mode';
 import { rememberWindow } from './context-window';
 import { addNewToGroup, EMPTY, reconcile } from '@shared/layout';
@@ -53,11 +54,13 @@ export interface ChatState {
   /** Итоги ответов на меню (на месте карточки) и якорь открытого меню — последний элемент журнала перед ним */
   answers: MenuAnswer[];
   menuAnchor: string | null;
+  /** Закреплённые сообщения (локально, по хосту и сессии) */
+  pins: Pin[];
   /** Контекст сессии (значок и панель «Контекст») */
   context: SessionContext;
 }
 const EMPTY_CONTEXT: SessionContext = { used: null, usedAt: null, model: null, snapshot: null, snapshotAt: null, snapshotModel: null };
-const EMPTY_CHAT: ChatState = { items: [], pending: [], typing: {}, hasEarlier: false, screen: null, busy: false, unavailable: null, answers: [], menuAnchor: null, context: EMPTY_CONTEXT };
+const EMPTY_CHAT: ChatState = { items: [], pending: [], typing: {}, hasEarlier: false, screen: null, busy: false, unavailable: null, answers: [], menuAnchor: null, pins: [], context: EMPTY_CONTEXT };
 
 let state: AppState = {
   view: 'loading',
@@ -86,7 +89,7 @@ const METRICS_WINDOW_MS = 5 * 60_000;
 
 function patchChat(session: string | null | undefined, patch: (c: ChatState) => Partial<ChatState>): void {
   if (!session) return;
-  const prev = state.chat[session] ?? { ...EMPTY_CHAT, answers: loadAnswers(state.config?.host ?? '', session) };
+  const prev = state.chat[session] ?? { ...EMPTY_CHAT, answers: loadAnswers(state.config?.host ?? '', session), pins: loadPins(state.config?.host ?? '', session) };
   setState({ chat: { ...state.chat, [session]: { ...prev, ...patch(prev) } } });
 }
 
@@ -182,7 +185,10 @@ export async function init(): Promise<void> {
       const typing = nextTyping(c.typing, c.items, e, performance.now());
       const context = e.context ?? c.context;
       if (context.snapshot && context.snapshotModel && context.snapshotAt !== c.context.snapshotAt) rememberWindow(context.snapshotModel, context.snapshot);
-      return { items, typing, pending: claimPending(c.pending, items, Date.now(), c.busy), hasEarlier: e.hasEarlier, unavailable: null, context };
+      // Пустой журнал (claude перезапускается) закрепления не стирает
+      const pins = items.length ? dropMissing(c.pins, items.map((i) => i.id), e.hasEarlier) : c.pins;
+      if (pins !== c.pins) savePins(state.config?.host ?? '', e.session, pins);
+      return { items, typing, pins, pending: claimPending(c.pending, items, Date.now(), c.busy), hasEarlier: e.hasEarlier, unavailable: null, context };
     }),
   );
   // Доставленные пузыри без записи журнала уходят сами
@@ -300,6 +306,15 @@ let pendingSeq = 0;
 const lastMenuKey = new Map<string, MenuKey>();
 
 /** Клавиша карточки меню: запоминается последняя — Esc даёт итог «отменено». */
+/** Закрепить сообщение ленты или открепить, если оно уже закреплено. */
+export function togglePinned(session: string, item: { id: string; text: string }): void {
+  patchChat(session, (c) => {
+    const pins = togglePin(c.pins, item, Date.now());
+    savePins(state.config?.host ?? '', session, pins);
+    return { pins };
+  });
+}
+
 export function menuKey(session: string, k: MenuKey): ReturnType<typeof api.chat.key> {
   lastMenuKey.set(session, k);
   return api.chat.key(k, session);

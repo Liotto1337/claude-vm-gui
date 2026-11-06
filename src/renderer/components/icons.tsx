@@ -97,3 +97,10 @@ export const IconPulse = () => (
     <path d="M3 12h4l3-8 4 16 3-8h4" />
   </svg>
 );
+export const IconUnpin = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" {...base} strokeWidth="2" aria-hidden="true">
+    <path d="M9 3h6l-1 6 3 3v2H7v-2l3-3z" />
+    <path d="M12 14v7" />
+    <path d="M4 4l16 16" />
+  </svg>
+);

@@ -554,3 +554,38 @@ test('Claude Code не принял ответ — через 3 с ошибка 
     await app.close();
   }
 });
+
+test('закрепление: ПКМ → Прикрепить → панель под шапкой → переход → Открепить', async () => {
+  const { app, page } = await open();
+  try {
+    await expect(feed(page)).toBeVisible({ timeout: 15_000 });
+    const bar = feed(page).getByRole('button', { name: /^Закреплённое сообщение/ });
+    await expect(bar).toHaveCount(0);
+
+    await feed(page).locator('.bubble-text', { hasText: /^привет$/ }).click({ button: 'right' });
+    await page.getByRole('menuitem', { name: 'Прикрепить' }).click();
+    await expect(bar).toContainText('привет');
+    await expect(bar).toContainText('Закреплённое сообщение');
+
+    await feed(page).locator('.md', { hasText: 'Сейчас посмотрю.' }).click({ button: 'right' });
+    await page.getByRole('menuitem', { name: 'Прикрепить' }).click();
+    // Сначала — последнее закреплённое, с номером и общим числом
+    await expect(bar).toContainText('#2 из 2');
+    await expect(bar).toContainText('Сейчас посмотрю.');
+    // Нажатие — переход, панель переключается на предыдущее
+    await bar.click();
+    await expect(bar).toContainText('#1 из 2');
+    await expect(bar).toContainText('привет');
+
+    // ПКМ по закреплённому — «Открепить»
+    await feed(page).locator('.bubble-text', { hasText: /^привет$/ }).click({ button: 'right' });
+    await page.getByRole('menuitem', { name: 'Открепить' }).click();
+    await expect(bar).toContainText('Закреплённое сообщение');
+    await expect(bar).not.toContainText('из 2');
+    await feed(page).locator('.md', { hasText: 'Сейчас посмотрю.' }).click({ button: 'right' });
+    await page.getByRole('menuitem', { name: 'Открепить' }).click();
+    await expect(bar).toHaveCount(0);
+  } finally {
+    await app.close();
+  }
+});
