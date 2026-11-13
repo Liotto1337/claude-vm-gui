@@ -42,6 +42,8 @@ test('новая сессия появляется, открывается, те
     await page.getByRole('button', { name: 'Новая сессия' }).click();
     const dialog = page.getByRole('dialog', { name: 'Новая сессия' });
     await expect(dialog.getByLabel('Сразу запустить claude')).toBeChecked();
+    await dialog.getByLabel('Имя сессии tmux').fill('   ');
+    await expect(dialog.getByRole('button', { name: 'Создать' })).toBeDisabled();
     await dialog.getByLabel('Имя сессии tmux').fill('bad name');
     await expect(dialog.getByRole('button', { name: 'Создать' })).toBeDisabled();
     await expect(dialog.getByText('Латиница, цифры, дефис и подчёркивание')).toBeVisible();
@@ -52,7 +54,8 @@ test('новая сессия появляется, открывается, те
     await expect(dialog.getByLabel('Рабочая папка на ВМ')).toHaveValue('/root');
     await dialog.getByRole('button', { name: 'Отмена' }).click();
 
-    await createSession(page, name);
+    await createSession(page, `  ${name}  `);
+    expect(tmuxNames()).toContain(name);
     const item = page.getByRole('navigation', { name: 'Сессии' }).getByRole('button', { name: new RegExp(name) });
     await expect(item).toHaveAttribute('aria-current', 'page');
     await expect(page.getByRole('heading', { name })).toBeVisible();

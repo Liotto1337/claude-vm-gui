@@ -13,7 +13,8 @@ export function NewSessionDialog({ onClose, group }: { onClose: () => void; grou
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const listId = useId();
-  const nameOk = validateSessionName(name);
+  const trimmedName = name.trim();
+  const nameOk = validateSessionName(trimmedName);
 
   useEffect(() => {
     if (!showDirs) return;
@@ -27,7 +28,7 @@ export function NewSessionDialog({ onClose, group }: { onClose: () => void; grou
     e.preventDefault();
     if (!nameOk || busy) return;
     setBusy(true);
-    const err = await createSession(name, dir, startClaude, group);
+    const err = await createSession(trimmedName, dir, startClaude, group);
     setBusy(false);
     if (err) setError(err);
     else onClose();
