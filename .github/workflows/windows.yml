@@ -12,6 +12,8 @@ permissions:
 jobs:
   build:
     runs-on: windows-latest
+    env:
+      VITE_BUG_REPORT_ORIGIN: ${{ vars.BUG_REPORT_ORIGIN }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7

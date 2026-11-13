@@ -416,3 +416,27 @@ button.file-row { cursor: pointer; }
 .context-name { flex: 1; min-width: 0; }
 .context-pct { width: 48px; text-align: right; }
 .context-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+
+.bug-report-dialog {
+  width: min(480px, calc(100% - 32px));
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  border: 0.5px solid var(--border);
+  color: var(--text);
+}
+.bug-report-dialog:not([open]) { display: none; }
+.bug-report-dialog::backdrop { background: var(--overlay); }
+.bug-report-dialog > form { display: flex; flex-direction: column; gap: 16px; }
+.bug-report-dialog textarea {
+  padding: 8px 12px;
+  border: 0.5px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  resize: vertical;
+}
+.bug-report-dialog input[type='file'] { padding: 8px; min-height: auto; }
+.bug-report-files { list-style: none; margin: 0; padding: 0; }
+.bug-report-files li { flex-wrap: nowrap; overflow-wrap: anywhere; margin-top: 4px; }
+.bug-report-files .btn { flex: none; }

@@ -4,7 +4,7 @@ import { Logo } from './Logo';
 import { SessionList } from './SessionList';
 import { UsageBox } from './UsageBox';
 
-export function Sidebar({ onNewSession }: { onNewSession: (group?: string) => void }) {
+export function Sidebar({ onNewSession, onReport }: { onNewSession: (group?: string) => void; onReport: () => void }) {
   const { config, connection, serverOpen } = useAppState();
   const online = connection.state === 'connected';
   return (
@@ -33,6 +33,7 @@ export function Sidebar({ onNewSession }: { onNewSession: (group?: string) => vo
           <IconGear />
           Настройки подключения
         </button>
+        <button type="button" className="btn-ghost" onClick={onReport}>Сообщить об ошибке</button>
       </div>
     </nav>
   );

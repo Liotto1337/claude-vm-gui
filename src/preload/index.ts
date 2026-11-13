@@ -71,6 +71,7 @@ const api: Api = {
     dismissed: invoke('updates:dismissed'),
     dismiss: invoke('updates:dismiss'),
   } as Api['updates'],
+  bugReport: { deviceInfo: invoke('bugReport:deviceInfo') } as Api['bugReport'],
   platform: { theme: invoke('platform:theme'), onThemeChange: on('platform:themeChange') } as Api['platform'],
 };
 

@@ -5,7 +5,7 @@ import { connect, getState, previewTheme, saveConfig, setState, useAppState } fr
 
 const DEFAULTS: VmConfig = { host: '', port: 22, username: 'root', keyPath: '~/.ssh/id_ed25519', theme: 'system' };
 
-export function SettingsDialog({ onClose }: { onClose?: () => void }) {
+export function SettingsDialog({ onClose, onReport }: { onClose?: () => void; onReport?: () => void }) {
   const { config } = useAppState();
   const [form, setForm] = useState<VmConfig>(config ?? DEFAULTS);
   const [portText, setPortText] = useState(String((config ?? DEFAULTS).port));
@@ -33,6 +33,7 @@ export function SettingsDialog({ onClose }: { onClose?: () => void }) {
     <div className="overlay">
       <form role="dialog" aria-modal="true" aria-labelledby="settings-title" className="dialog" onSubmit={(e) => void submit(e)}>
         <h2 id="settings-title">Настройки подключения</h2>
+        {onReport ? <button type="button" className="btn" onClick={onReport}>Сообщить об ошибке</button> : null}
         <div className="field">
           <label htmlFor="set-host">Адрес ВМ</label>
           <input id="set-host" value={form.host} autoFocus placeholder="203.0.113.10" onChange={(e) => set({ host: e.target.value })} />

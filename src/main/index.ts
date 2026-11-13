@@ -5,7 +5,8 @@ import { cleanTemp } from './outbox';
 import { startUpdates } from './updates';
 import { IpcHub, repoDirForDev } from './ipc';
 
-const CSP = "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:";
+declare const __BUG_REPORT_ORIGIN__: string;
+const CSP = `connect-src 'self' ${__BUG_REPORT_ORIGIN__}; default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:`;
 
 // Тесты задают отдельную папку настроек, чтобы не трогать настоящую
 if (process.env.CVG_USER_DATA) app.setPath('userData', process.env.CVG_USER_DATA);

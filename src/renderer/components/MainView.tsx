@@ -11,7 +11,7 @@ import { ServerPanel } from './ServerPanel';
 import { Sidebar } from './Sidebar';
 import { TerminalView } from './TerminalView';
 
-export function MainView() {
+export function MainView({ onReport }: { onReport: () => void }) {
   const { sessions, current, chat, viewOverride, serverOpen } = useAppState();
   // Диалог новой сессии; group — сразу положить её в эту группу
   const [newSession, setNewSession] = useState<{ group?: string } | null>(null);
@@ -25,7 +25,7 @@ export function MainView() {
 
   return (
     <div className="main-layout">
-      <Sidebar onNewSession={(group) => setNewSession({ group })} />
+      <Sidebar onReport={onReport} onNewSession={(group) => setNewSession({ group })} />
       <main className="main-column">
         <UpdateBanner />
         <Banner />

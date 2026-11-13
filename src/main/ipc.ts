@@ -1,4 +1,5 @@
 import { app, clipboard, ipcMain, nativeTheme, safeStorage, shell, type BrowserWindow } from 'electron';
+import { arch, release } from 'node:os';
 import type { Result, SidebarLayout, VmConfig } from '@shared/ipc';
 import { externalUrl } from '@shared/links';
 import { loadConfig, loadPassword, saveConfig, type SecretBox } from './config';
@@ -66,6 +67,11 @@ export class IpcHub {
     // Раскладка сайдбара — отдельно для каждой ВМ
     this.handle('layout:get', () => this.layouts.get(this.config()?.host ?? ''));
     this.handle('layout:save', (l: SidebarLayout) => this.layouts.save(this.config()?.host ?? '', l));
+    this.handle('bugReport:deviceInfo', () => ({
+      os: `${process.platform} ${release()}`,
+      architecture: arch(),
+      webView: `Electron ${process.versions.electron} / Chromium ${process.versions.chrome}`,
+    }));
     this.handle('platform:theme', () => (nativeTheme.shouldUseDarkColors ? 'dark' : 'light'));
     nativeTheme.on('updated', () => this.emit('platform:themeChange', nativeTheme.shouldUseDarkColors ? 'dark' : 'light'));
     // Буфер обмена Windows через main: navigator.clipboard в renderer не пишет, пока окно не в фокусе

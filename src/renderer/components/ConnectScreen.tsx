@@ -12,7 +12,7 @@ function StepIcon({ e }: { e?: PreflightEvent }) {
   return <span className="step-dash" aria-label="Пропущено">—</span>;
 }
 
-export function ConnectScreen() {
+export function ConnectScreen({ onReport }: { onReport: () => void }) {
   const { config, preflight, connectError } = useAppState();
   const port = config?.port ?? 22;
   const steps: { step: PreflightStep; label: string }[] = [
@@ -60,6 +60,7 @@ export function ConnectScreen() {
             <button type="button" className="btn" onClick={() => { void api.connection.disconnect(); openSettings(); }}>Отмена</button>
           </div>
         )}
+        <button type="button" className="btn" onClick={onReport}>Сообщить об ошибке</button>
       </section>
     </div>
   );

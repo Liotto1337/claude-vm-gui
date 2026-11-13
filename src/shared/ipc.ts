@@ -277,6 +277,7 @@ export interface Api {
     dismissed(): Promise<string | null>;
     dismiss(version: string): Promise<void>;
   };
+  bugReport: { deviceInfo(): Promise<{ os: string; architecture: string; webView: string }> };
   platform: {
     theme(): Promise<'light' | 'dark'>;
     onThemeChange(cb: (t: 'light' | 'dark') => void): Unsubscribe;
