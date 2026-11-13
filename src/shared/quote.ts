@@ -3,12 +3,14 @@ export function shellQuote(s: string): string {
   return `'${s.replace(/'/g, `'\\''`)}'`;
 }
 
-/** Команда перехода в папку. «~» и «~/…» раскрываются через $HOME, остальное экранируется. */
-export function cdPrefix(dir: string): string {
+/** Переходит в папку, при необходимости создавая её. «~» и «~/…» раскрываются через $HOME. */
+export function cdPrefix(dir: string, { create = false } = {}): string {
   const d = dir.trim();
   if (d === '' || d === '~') return 'cd "$HOME"';
-  if (d.startsWith('~/')) return `cd "$HOME"/${shellQuote(d.slice(2))}`;
-  return `cd ${shellQuote(d)}`;
+  const path = d.startsWith('~/')
+    ? `"$HOME"/${shellQuote(d.slice(2))}`
+    : shellQuote(create && !d.startsWith('/') ? `./${d}` : d);
+  return create ? `mkdir -p -- ${path} && cd ${path}` : `cd ${path}`;
 }
 
 // Без точки: tmux молча заменяет её на «_» (my.proj → my_proj)

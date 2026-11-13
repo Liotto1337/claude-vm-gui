@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { mkdirSync, rmSync } from 'node:fs';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
@@ -75,11 +75,20 @@ describe.skipIf(!hasTestKey)('tmux и терминал', () => {
     expect(r.ok && r.data.find((s) => s.name === name)).toMatchObject({ cwd: ODD_DIR, claudeRunning: false });
   });
 
-  it('повтор имени — SESSION_EXISTS, плохое имя — BAD_NAME, нет папки — BAD_DIR', async () => {
+  it('создаёт отсутствующие вложенные папки и запускает сессию в указанной папке', async () => {
+    const nested = "новый проект 'тест'/#{session_name}";
+    const name = await newSession('mkdir', `~/cvg test 'q'/${nested}`);
+    const r = await tmux.list();
+    expect(r.ok && r.data.find((s) => s.name === name)).toMatchObject({ cwd: join(ODD_DIR, nested) });
+  });
+
+  it('повтор имени — SESSION_EXISTS, плохое имя — BAD_NAME, файл вместо папки — BAD_DIR', async () => {
     const name = await newSession('dup');
     expect(await tmux.create(name, '~', false)).toMatchObject({ ok: false, error: { code: 'SESSION_EXISTS' } });
     expect(await tmux.create('bad;name', '~', false)).toMatchObject({ ok: false, error: { code: 'BAD_NAME' } });
-    expect(await tmux.create(testSessionName('nodir'), '~/нет-такой-папки-cvg', false)).toMatchObject({
+    const file = join(ODD_DIR, 'file');
+    writeFileSync(file, 'keep');
+    expect(await tmux.create(testSessionName('file'), file, false)).toMatchObject({
       ok: false, error: { code: 'BAD_DIR' },
     });
   });

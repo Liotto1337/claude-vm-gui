@@ -42,8 +42,9 @@ export class TmuxService {
     const existing = await this.list();
     if (!existing.ok) return existing;
     if (existing.data.some((s) => s.name === name)) return fail('SESSION_EXISTS', `Сессия ${name} уже есть`);
-    const r = await this.conn.exec(`${cdPrefix(dir)} || exit 90; ${tmuxCmd()} new-session -d -s ${shellQuote(name)} -c "$PWD"`);
-    if (r.code === 90) return fail('BAD_DIR', `Папки ${dir} на ВМ нет`);
+    // tmux наследует рабочую папку клиента, а параметр -c раскрывает шаблоны в пути.
+    const r = await this.conn.exec(`${cdPrefix(dir, { create: true })} || exit 90; ${tmuxCmd()} new-session -d -s ${shellQuote(name)}`);
+    if (r.code === 90) return fail('BAD_DIR', `Не удалось открыть или создать рабочую папку ${dir} на ВМ`);
     if (r.code === 127) return fail('NO_TMUX', NO_TMUX);
     if (r.code !== 0) return fail('NO_SESSION', r.stderr.trim());
     return startClaude ? this.startClaude(name) : ok(undefined);
