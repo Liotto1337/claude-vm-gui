@@ -38,3 +38,14 @@ jobs:
         with:
           files: release/*.exe
           prerelease: ${{ contains(github.ref_name, '-') }}
+      - name: Публикация пре-релиза v0.7.1-rc.1
+        if: github.event_name == 'push' && github.ref == 'refs/heads/release/v0.7.1-rc.1'
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: v0.7.1-rc.1
+          target_commitish: ${{ github.sha }}
+          body_path: release-notes.md
+          files: release/*.exe
+          fail_on_unmatched_files: true
+          prerelease: true
+          make_latest: false
